@@ -792,20 +792,23 @@ def _select_zai_endpoint(current_base: str) -> str:
 
 
 _GEMINI_FREE_TIER_NOTICE = (
-    "", "❌ This Google API key is on the free tier (<= 250 requests/day for gemini-2.5-flash).",
-    "   Hermes typically makes 3-10 API calls per user turn (tool iterations + auxiliary tasks),",
-    "   so the free tier is exhausted after a handful of messages and cannot sustain",
-    "   an agent session.", "",
-    "   To use Gemini with Hermes, enable billing on your Google Cloud project and regenerate",
-    "   the key in a billing-enabled project: https://aistudio.google.com/apikey", "",
-    "   Alternatives with workable free usage: DeepSeek, OpenRouter (free models), Groq, Nous.", "",
-    "Not saving Gemini as the default provider.")
+    "", "✓ Gemini free tier detected — supported by Edit Aja AI Agent.",
+    "   Billing is not required. Free-tier quotas are limited, so long agent sessions may",
+    "   eventually pause until Google's quota window resets.", "",
+    "   You can keep additional independently authorized Gemini credentials in Hermes with:",
+    '     hermes auth add gemini --type api-key --label "Gemini 02"',
+    "   Hermes will use its normal credential health/cooldown logic. Respect Google's",
+    "   account and quota terms; the pool is for resilience, not quota circumvention.", "")
 
 
 def _gemini_tier_ok(existing_key: str, pconfig, base_url_env: str) -> bool:
-    """Gemini free-tier gate: free-tier daily quotas (<= 250 RPD for Flash) are exhausted in a
-    handful of agent turns, so refuse a free-tier key. The probe is best-effort; network or
-    auth errors fall through without blocking."""
+    """Probe the Gemini tier for user guidance without blocking free-tier keys.
+
+    Upstream Hermes rejected free-tier Google AI Studio keys during setup. Edit Aja is
+    intentionally free-tier friendly: a free key is accepted and runtime quota handling
+    decides whether a request can proceed. Network/auth probe failures also remain
+    non-blocking so setup never turns a transient probe failure into a configuration block.
+    """
     try:
         from agent.gemini_native_adapter import probe_gemini_tier
     except Exception:
@@ -814,9 +817,7 @@ def _gemini_tier_ok(existing_key: str, pconfig, base_url_env: str) -> bool:
     tier = probe_gemini_tier(existing_key, _env_base_url(base_url_env) or pconfig.inference_base_url)
     if tier == "free":
         _say(*_GEMINI_FREE_TIER_NOTICE)
-        return False
-    # "unknown" (network/auth/unexpected response): don't block; the runtime 429 handler
-    # surfaces free-tier guidance if needed.
+        return True
     _say("  Tier check: paid ✓" if tier == "paid" else "  Tier check: could not verify (proceeding anyway).", "")
     return True
 
