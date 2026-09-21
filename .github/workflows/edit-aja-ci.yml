@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - edit-aja-gemini-foundation
+      - edit-aja-local-command-router
   pull_request:
 
 permissions:
@@ -30,9 +31,15 @@ jobs:
           python -m pip install -e .
           python -m pip install pytest
 
-      - name: Run Edit Aja Gemini tests
+      - name: Run Edit Aja tests
         run: |
-          pytest -q             tests/agent/test_gemini_free_tier_gate.py             tests/hermes_cli/test_edit_aja_gemini_mode.py
+          pytest -q \
+            tests/agent/test_gemini_free_tier_gate.py \
+            tests/hermes_cli/test_edit_aja_gemini_mode.py \
+            tests/gateway/test_edit_aja_local_router.py \
+            tests/gateway/test_display_config.py \
+            tests/gateway/test_verbose_command.py \
+            tests/hermes_cli/test_desktop_slash_registry.py
 
       - name: Parse Windows setup scripts
         shell: pwsh
