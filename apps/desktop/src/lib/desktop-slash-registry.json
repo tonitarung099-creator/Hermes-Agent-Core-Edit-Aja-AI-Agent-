@@ -1,5 +1,6 @@
 {
   "/agents": null,
+  "/api": "hidden",
   "/approvals": null,
   "/approve": "messaging",
   "/battery": null,
@@ -73,6 +74,7 @@
   "/prompt": null,
   "/q": null,
   "/queue": null,
+  "/quiet": "hidden",
   "/quit": "terminal",
   "/reasoning": null,
   "/redraw": "terminal",
