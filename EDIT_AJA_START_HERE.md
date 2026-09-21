@@ -132,3 +132,24 @@ Keep the project progression in this order:
 - API/model routing and cost controls
 
 The core rule is: **use deterministic/local tools first; call an LLM only when reasoning is actually needed.**
+
+## Edit Aja local commands
+
+These commands are handled locally by the gateway and do not need a Gemini reasoning turn:
+
+```text
+/status        Compact Edit Aja runtime status
+/model         Current Gemini main/light models
+/api           Gemini credential-pool health (READY / COOLDOWN / DEAD)
+/quiet on      Final-answer-first Telegram mode
+/quiet off     Show technical progress again
+/debug on      Alias for technical/debug display
+/debug off     Return to Quiet Mode
+```
+
+Natural-language status questions such as **"model yang kamu pakai apa?"**, **"api saya ada berapa?"**, and **"gateway hidup?"** are also answered by the local router when Edit Aja mode is enabled.
+
+The API status intentionally does **not** invent a remaining-quota percentage. Gemini does not provide a reliable per-key percentage through the inference path used here, so Edit Aja reports only locally observed credential health.
+
+Quiet Mode is the Edit Aja default. Tool calls, redirect/queue acknowledgements, interim scratch messages, and long-running technical chatter are hidden from Telegram while final answers remain visible. Technical details remain available in local logs and can be shown again with `/debug on`.
+

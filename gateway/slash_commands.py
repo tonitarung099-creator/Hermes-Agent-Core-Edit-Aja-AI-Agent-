@@ -1208,8 +1208,26 @@ class GatewaySlashCommandsMixin(
         return await self._deliver_approval_confirmation(event, confirmation_text, "deny")
 
     async def _handle_debug_command(self, event: MessageEvent) -> str:
-        """Handle /debug — upload ONLY the summary (system info + log tails), never full logs, to
-        protect privacy; ``hermes debug share`` from the CLI does full uploads."""
+        """Handle /debug.
+
+        Edit Aja reserves /debug on|off|status for Telegram display verbosity.
+        Other arguments keep Hermes' upstream diagnostic-report behavior.
+        """
+        _edit_aja_debug_arg = (event.get_command_args() or "").strip().lower()
+        if _edit_aja_debug_arg in {"on", "off", "status"}:
+            try:
+                from hermes_cli.config import load_config
+                from gateway.edit_aja_local import edit_aja_enabled, quiet_status, set_quiet_mode
+                _edit_aja_cfg = load_config()
+                if edit_aja_enabled(_edit_aja_cfg):
+                    if _edit_aja_debug_arg == "on":
+                        return set_quiet_mode(False)
+                    if _edit_aja_debug_arg == "off":
+                        return set_quiet_mode(True)
+                    return quiet_status(_edit_aja_cfg)
+            except Exception:
+                logger.debug("Edit Aja /debug display toggle failed; using upstream debug path", exc_info=True)
+
         from hermes_cli.debug import (_GATEWAY_PRIVACY_NOTICE, _best_effort_sweep_expired_pastes,
                                       _capture_dump, _is_dpaste_url, _schedule_auto_delete,
                                       collect_debug_report, upload_to_pastebin)

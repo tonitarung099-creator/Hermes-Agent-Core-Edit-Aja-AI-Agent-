@@ -235,6 +235,17 @@ class GatewayStatusCommandsMixin:
 
     async def _handle_status_command(self, event: MessageEvent) -> str:
         """Handle /status command."""
+        # Edit Aja installs an intentionally compact, fully local operational
+        # status. Other Hermes profiles keep the upstream session-centric view.
+        try:
+            from hermes_cli.config import load_config
+            from gateway.edit_aja_local import compact_status, edit_aja_enabled
+            _edit_aja_cfg = load_config()
+            if edit_aja_enabled(_edit_aja_cfg):
+                return compact_status(_edit_aja_cfg)
+        except Exception:
+            logger.debug("Edit Aja compact /status failed; using upstream status", exc_info=True)
+
         from gateway.run import _AGENT_PENDING_SENTINEL
         source = event.source
         session_entry = await self.async_session_store.get_or_create_session(source)
@@ -320,6 +331,27 @@ class GatewayStatusCommandsMixin:
             ]
         lines += ["", t("gateway.status.platforms", platforms=', '.join(p.value for p in self.adapters))]
         return "\n".join(lines)
+
+    async def _handle_api_command(self, event: MessageEvent) -> str:
+        """Edit Aja /api — Gemini credential-pool health without an LLM call."""
+        try:
+            from gateway.edit_aja_local import api_status
+            return api_status()
+        except Exception as exc:
+            logger.warning("Edit Aja /api status failed: %s", exc)
+            return "Could not read the local Gemini API pool."
+
+    async def _handle_quiet_command(self, event: MessageEvent) -> str:
+        """Edit Aja /quiet [on|off|status] — toggle Telegram final-answer-first display."""
+        from gateway.edit_aja_local import quiet_status, set_quiet_mode
+        arg = (event.get_command_args() or "").strip().lower()
+        if not arg or arg == "status":
+            return quiet_status()
+        if arg in {"on", "enable", "true", "1"}:
+            return set_quiet_mode(True)
+        if arg in {"off", "disable", "false", "0"}:
+            return set_quiet_mode(False)
+        return "Usage: /quiet [on|off|status]"
 
     async def _status_session_db_facts(self, session_id: str):
         """``(title, session_row, db_total_tokens, persisted_route)`` for /status; each fail-open.
