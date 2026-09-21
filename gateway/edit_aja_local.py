@@ -50,6 +50,19 @@ def _quiet_enabled(config: dict[str, Any]) -> bool:
     return False
 
 
+def _fallback_routes(config: dict[str, Any]) -> list[tuple[str, str]]:
+    raw = config.get("fallback_providers")
+    routes: list[tuple[str, str]] = []
+    for item in raw if isinstance(raw, list) else []:
+        if not isinstance(item, dict):
+            continue
+        provider = str(item.get("provider") or "").strip()
+        model = str(item.get("model") or "").strip()
+        if provider and model:
+            routes.append((provider, model))
+    return routes
+
+
 def model_status(config: dict[str, Any] | None = None) -> str:
     if config is None:
         from hermes_cli.config import load_config
@@ -58,17 +71,17 @@ def model_status(config: dict[str, Any] | None = None) -> str:
     model = _model_config(config)
     main_model = str(model.get("default") or "unknown")
     provider = str(model.get("provider") or "unknown")
-    light_model = str(
-        _aux_config(config, "compression").get("model")
-        or _aux_config(config, "title_generation").get("model")
-        or main_model
-    )
-    return "\n".join([
+    lines = [
         "🤖 **Edit Aja AI Model**",
-        f"Provider: **{provider}**",
-        f"Main model: `{main_model}`",
-        f"Light model: `{light_model}`",
-    ])
+        f"Primary: **{provider}** / `{main_model}`",
+    ]
+    for index, (fallback_provider, fallback_model) in enumerate(_fallback_routes(config), start=1):
+        lines.append(
+            f"Fallback {index}: **{fallback_provider}** / `{fallback_model}`"
+        )
+    if (config.get("edit_aja") or {}).get("gemini_enabled") is False:
+        lines.append("Gemini: **DISABLED**")
+    return "\n".join(lines)
 
 
 def _entry_state(
@@ -91,15 +104,26 @@ def _entry_state(
     return "READY"
 
 
-def api_snapshot(config: dict[str, Any] | None = None) -> dict[str, Any]:
-    if config is None:
-        from hermes_cli.config import load_config
-        config = load_config()
-    config = config if isinstance(config, dict) else {}
-    main_model = str(_model_config(config).get("default") or "")
+def _provider_model(config: dict[str, Any], provider: str) -> str:
+    model = _model_config(config)
+    if str(model.get("provider") or "").strip().lower() == provider.lower():
+        return str(model.get("default") or "")
+    for fallback_provider, fallback_model in _fallback_routes(config):
+        if fallback_provider.lower() == provider.lower():
+            return fallback_model
+    providers = config.get("providers")
+    entry = providers.get(provider) if isinstance(providers, dict) else None
+    if isinstance(entry, dict):
+        return str(entry.get("default_model") or entry.get("model") or "")
+    return ""
+
+
+def _provider_snapshot(
+    provider: str, model: str, *, display_name: str | None = None
+) -> dict[str, Any]:
     try:
         from agent.credential_pool import load_pool
-        pool = load_pool("gemini")
+        pool = load_pool(provider)
         entries = sorted(pool.entries(), key=lambda item: (item.priority, item.label))
     except Exception:
         entries = []
@@ -111,41 +135,94 @@ def api_snapshot(config: dict[str, Any] | None = None) -> dict[str, Any]:
     for index, entry in enumerate(entries, start=1):
         rows.append({
             "index": index,
-            "label": str(getattr(entry, "label", "") or f"Gemini {index:02d}"),
+            "label": str(getattr(entry, "label", "") or f"{provider} {index:02d}"),
             "priority": int(getattr(entry, "priority", index - 1) or 0),
             "state": _entry_state(
-                entry, main_model=main_model, now=now, sole_credential=sole_credential
+                entry, main_model=model, now=now, sole_credential=sole_credential
             ),
             "request_count": int(getattr(entry, "request_count", 0) or 0),
         })
 
     ready = [row for row in rows if row["state"] == "READY"]
-    preferred = ready[0]["label"] if ready else None
     return {
+        "provider": provider,
+        "display_name": display_name or provider,
+        "model": model,
         "rows": rows,
         "total": len(rows),
         "ready": sum(row["state"] == "READY" for row in rows),
         "cooldown": sum(row["state"] == "COOLDOWN" for row in rows),
         "dead": sum(row["state"] == "DEAD" for row in rows),
-        "preferred": preferred,
+        "preferred": ready[0]["label"] if ready else None,
+    }
+
+
+def api_snapshot(config: dict[str, Any] | None = None) -> dict[str, Any]:
+    if config is None:
+        from hermes_cli.config import load_config
+        config = load_config()
+    config = config if isinstance(config, dict) else {}
+
+    model = _model_config(config)
+    routes: list[tuple[str, str]] = []
+    primary_provider = str(model.get("provider") or "").strip()
+    primary_model = str(model.get("default") or "").strip()
+    if primary_provider:
+        routes.append((primary_provider, primary_model))
+    routes.extend(_fallback_routes(config))
+
+    seen: set[str] = set()
+    providers: list[dict[str, Any]] = []
+    labels = {
+        "cerebras": "Cerebras",
+        "cloudflare": "Cloudflare",
+        "groq": "Groq",
+    }
+    for provider, route_model in routes:
+        key = provider.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        providers.append(
+            _provider_snapshot(
+                provider,
+                route_model or _provider_model(config, provider),
+                display_name=labels.get(key, provider),
+            )
+        )
+
+    all_rows = [row for provider in providers for row in provider["rows"]]
+    return {
+        "providers": providers,
+        "rows": all_rows,
+        "total": len(all_rows),
+        "ready": sum(row["state"] == "READY" for row in all_rows),
+        "cooldown": sum(row["state"] == "COOLDOWN" for row in all_rows),
+        "dead": sum(row["state"] == "DEAD" for row in all_rows),
     }
 
 
 def api_status(config: dict[str, Any] | None = None) -> str:
     snap = api_snapshot(config)
     lines = [
-        "🔑 **Gemini API Pool**",
-        f"Keys: **{snap['total']}**  |  READY: **{snap['ready']}**  |  COOLDOWN: **{snap['cooldown']}**  |  DEAD: **{snap['dead']}**",
+        "🔑 **Edit Aja API Pools**",
+        f"Credentials: **{snap['total']}**  |  READY: **{snap['ready']}**  |  COOLDOWN: **{snap['cooldown']}**  |  DEAD: **{snap['dead']}**",
     ]
-    for row in snap["rows"]:
-        icon = "✅" if row["state"] == "READY" else "⏳" if row["state"] == "COOLDOWN" else "❌"
-        lines.append(f"{icon} {row['label']}: **{row['state']}**")
-    if snap["preferred"]:
-        lines.append(f"Preferred next key: **{snap['preferred']}**")
+    for provider in snap["providers"]:
+        lines.append("")
+        lines.append(
+            f"**{provider['display_name']}** — `{provider['model'] or 'model unknown'}`"
+        )
+        if not provider["rows"]:
+            lines.append("⚪ No API key stored")
+            continue
+        for row in provider["rows"]:
+            icon = "✅" if row["state"] == "READY" else "⏳" if row["state"] == "COOLDOWN" else "❌"
+            lines.append(f"{icon} {row['label']}: **{row['state']}**")
     lines.extend([
         "",
-        "Quota remaining (%): **not available reliably from Gemini API**.",
-        "Edit Aja will not invent a percentage.",
+        "Remaining quota (%): **not reliably available from these inference APIs**.",
+        "Edit Aja reports observed key health and never invents a percentage.",
     ])
     return "\n".join(lines)
 
@@ -157,24 +234,19 @@ def compact_status(config: dict[str, Any] | None = None) -> str:
     config = config if isinstance(config, dict) else {}
     model = _model_config(config)
     snap = api_snapshot(config)
-    light_model = str(
-        _aux_config(config, "compression").get("model")
-        or _aux_config(config, "title_generation").get("model")
-        or model.get("default")
-        or "unknown"
-    )
     quiet = "ON" if _quiet_enabled(config) else "OFF"
+    fallbacks = _fallback_routes(config)
+    fallback_text = " → ".join(provider for provider, _ in fallbacks) or "none"
     return "\n".join([
         "🟢 **EDIT AJA AI AGENT**",
         f"Gateway: **ONLINE** (PID {os.getpid()})",
-        f"Provider: **{model.get('provider') or 'unknown'}**",
-        f"Main model: `{model.get('default') or 'unknown'}`",
-        f"Light model: `{light_model}`",
-        f"Gemini keys: **{snap['total']}** ({snap['ready']} ready, {snap['cooldown']} cooldown, {snap['dead']} dead)",
+        f"Primary: **{model.get('provider') or 'unknown'}** / `{model.get('default') or 'unknown'}`",
+        f"Fallbacks: **{fallback_text}**",
+        f"API credentials: **{snap['total']}** ({snap['ready']} ready, {snap['cooldown']} cooldown, {snap['dead']} dead)",
         f"Quiet mode: **{quiet}**",
+        f"Gemini: **{'DISABLED' if (config.get('edit_aja') or {}).get('gemini_enabled') is False else 'not configured by Edit Aja'}**",
         "Laptop: **ONLINE**",
     ])
-
 
 def apply_quiet_mode(config: dict[str, Any] | None, enabled: bool) -> dict[str, Any]:
     """Return a config copy with Edit Aja Telegram quiet/debug display settings."""
@@ -262,8 +334,11 @@ def local_intent(text: str) -> str | None:
         return None
 
     # API/key count and health questions. Deliberately requires count/status
-    # language so generic questions about "Gemini API" still reach the LLM.
-    api_terms = ("api", "api key", "key gemini", "gemini key")
+    # language so generic provider questions still reach the LLM.
+    api_terms = (
+        "api", "api key", "cerebras key", "key cerebras",
+        "cloudflare key", "key cloudflare", "groq key", "key groq",
+    )
     if any(term in value for term in api_terms) and (
         any(term in value for term in ("berapa", "jumlah", "masih berapa", "status", "tersisa", "sisa", "ready", "cooldown"))
         or re.search(r"\bhow many\b", value)
