@@ -48,6 +48,7 @@ jobs:
         run: |
           [scriptblock]::Create((Get-Content scripts/configure-edit-aja-free-cloud.ps1 -Raw)) | Out-Null
           [scriptblock]::Create((Get-Content scripts/configure-edit-aja-gemini.ps1 -Raw)) | Out-Null
+          [scriptblock]::Create((Get-Content scripts/switch-edit-aja-free-cloud.ps1 -Raw)) | Out-Null
 
           $bootstrap = Get-Content scripts/install-edit-aja-windows.ps1 -Raw
           [scriptblock]::Create($bootstrap) | Out-Null
@@ -73,6 +74,17 @@ jobs:
           }
           if (-not $freeCloud.Contains('$providersToList += "cloudflare"')) {
             throw "Free-cloud setup must include Cloudflare status only when Cloudflare is configured."
+          }
+
+          $migration = Get-Content scripts/switch-edit-aja-free-cloud.ps1 -Raw
+          if (-not $migration.Contains('configure-edit-aja-free-cloud.ps1')) {
+            throw "Migration helper must invoke the free-cloud setup."
+          }
+          if (-not $migration.Contains('gateway restart')) {
+            throw "Migration helper must reload the gateway after changing provider routing."
+          }
+          if ($migration.Contains('auth add gemini')) {
+            throw "Migration helper must never add Gemini credentials."
           }
 
           Write-Host "PowerShell syntax and non-Gemini bootstrap checks OK"

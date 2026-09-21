@@ -73,15 +73,13 @@ For Cloudflare Workers AI, the setup also asks for your **Cloudflare Account ID*
 
 ### Existing installation: switch away from Gemini
 
-After updating the repository, run:
+For an existing Windows install, use the migration helper. It updates the fork, applies the Cerebras-first profile, restarts the gateway, and verifies status:
 
 ```powershell
-$env:HERMES_HOME="D:\EditAjaAI"
-$setup="D:\EditAjaAI\hermes-agent\scripts\configure-edit-aja-free-cloud.ps1"
-& ([scriptblock]::Create((Get-Content -LiteralPath $setup -Raw)))
+& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/tonitarung099-creator/Hermes-Agent-Core-Edit-Aja-AI-Agent-/main/scripts/switch-edit-aja-free-cloud.ps1"))) -HermesHome "D:\EditAjaAI"
 ```
 
-The script rewrites Edit Aja routing to Cerebras/Cloudflare/Groq. Existing Gemini credentials may remain stored locally, but the Edit Aja profile will not route requests to them.
+The helper asks for a Cerebras API key and optional Cloudflare/Groq credentials through Hermes' masked prompts. Existing Gemini credentials may remain stored locally, but the Edit Aja profile will not route requests to them.
 
 ## Telegram preparation
 
