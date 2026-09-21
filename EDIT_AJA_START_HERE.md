@@ -50,6 +50,7 @@ Default routing:
 
 - Primary: **Cerebras** — `gpt-oss-120b`
 - Fallback 1: **Cloudflare Workers AI** — `@cf/zai-org/glm-4.7-flash` when a Cloudflare Account ID + API token are configured
+- Vision/screenshots (when Cloudflare is configured): **Cloudflare Gemma 4 26B** — `@cf/google/gemma-4-26b-a4b-it`
 - Fallback 2: **Groq** — `openai/gpt-oss-120b`
 - Gemini: **disabled for Edit Aja routing**
 - API retry count: **1** per provider call
