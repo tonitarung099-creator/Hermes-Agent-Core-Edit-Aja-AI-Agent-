@@ -1282,6 +1282,19 @@ class GatewayInboundMixin:
         if _reply is not None:
             return _reply
 
+        # Edit Aja local-first control questions bypass the model entirely. Keep this
+        # BEFORE the running-session fast path: asking "model apa?" or "api saya
+        # berapa?" must not redirect/interrupt an active Gemini turn.
+        if not is_internal and not getattr(event, "media_urls", None):
+            try:
+                from gateway.edit_aja_local import local_reply as _edit_aja_local_reply
+                _local_reply = _edit_aja_local_reply(event.text or "")
+            except Exception:
+                logger.debug("Edit Aja local router failed; falling through to normal agent path", exc_info=True)
+                _local_reply = None
+            if _local_reply is not None:
+                return _local_reply
+
         # Evict a leaked/reaped ``_running_agents`` slot before the busy-session fast-path.
         self._hm_evict_idle_stale_agent(_quick_key)
         if self._is_session_running(_quick_key):
