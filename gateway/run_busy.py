@@ -839,9 +839,20 @@ class GatewayBusySessionMixin:
         ):
             await self._interrupt_running_agent_for_busy_event(event, adapter, running_agent)
 
-        # Disabled ack: still process input. Checked before debounce so an undelivered ack never
-        # stamps the "last ack" timestamp.
-        if os.environ.get("HERMES_GATEWAY_BUSY_ACK_ENABLED", "true").lower() != "true":
+        # Disabled ack: still process input. Environment override wins for backwards
+        # compatibility; otherwise use the per-platform display setting. Edit Aja Quiet Mode
+        # sets Telegram busy_ack_enabled=false so redirect/queue diagnostics stay in local logs.
+        _busy_ack_env = os.environ.get("HERMES_GATEWAY_BUSY_ACK_ENABLED")
+        if _busy_ack_env is not None:
+            _busy_ack_enabled = _busy_ack_env.strip().lower() in {"1", "true", "yes", "on"}
+        else:
+            from gateway.run import _load_gateway_config, _platform_config_key
+            from gateway.display_config import resolve_display_setting
+            _busy_ack_enabled = bool(resolve_display_setting(
+                _load_gateway_config(), _platform_config_key(event.source.platform),
+                "busy_ack_enabled", True,
+            ))
+        if not _busy_ack_enabled:
             logger.debug("Busy ack suppressed for session %s", session_key)
             return True  # input still processed, just no ack sent
 
