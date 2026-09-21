@@ -30,6 +30,7 @@ CLOUDFLARE_BASE_URL_TEMPLATE = (
 
 DEFAULT_MAIN_MODEL = "gpt-oss-120b"
 DEFAULT_CLOUDFLARE_MODEL = "@cf/zai-org/glm-4.7-flash"
+DEFAULT_CLOUDFLARE_VISION_MODEL = "@cf/google/gemma-4-26b-a4b-it"
 DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b"
 DEFAULT_CONTEXT_LENGTH = 131_072
 
@@ -138,6 +139,10 @@ def build_edit_aja_free_cloud_config(
             model=cloudflare_model,
             context_length=DEFAULT_CONTEXT_LENGTH,
         )
+        # Separate free-plan vision route for screenshots/UI understanding.
+        providers["cloudflare"]["models"][DEFAULT_CLOUDFLARE_VISION_MODEL] = {
+            "context_length": 256_000,
+        }
     else:
         providers.pop("cloudflare", None)
     cfg["providers"] = providers
@@ -172,6 +177,17 @@ def build_edit_aja_free_cloud_config(
         for key in ("base_url", "api_key", "key_env", "fallback_chain"):
             block.pop(key, None)
         auxiliary[task] = block
+
+    # Cerebras GPT-OSS is the reasoning/tool brain, while Cloudflare Gemma is
+    # used only for image/screenshot understanding when Cloudflare is present.
+    if cf_account:
+        vision = dict(auxiliary.get("vision") or {})
+        vision["provider"] = "cloudflare"
+        vision["model"] = DEFAULT_CLOUDFLARE_VISION_MODEL
+        for key in ("base_url", "api_key", "key_env", "fallback_chain"):
+            vision.pop(key, None)
+        auxiliary["vision"] = vision
+
     cfg["auxiliary"] = auxiliary
 
     agent = _dict_section(cfg, "agent")
