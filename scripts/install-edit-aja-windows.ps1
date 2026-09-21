@@ -79,7 +79,8 @@ $geminiSetup = Join-Path $installDir "scripts\configure-edit-aja-gemini.ps1"
 if (-not (Test-Path -LiteralPath $geminiSetup)) {
     throw "Gemini setup helper was not found at $geminiSetup"
 }
-& $geminiSetup
+$geminiSetupText = Get-Content -LiteralPath $geminiSetup -Raw
+& ([scriptblock]::Create($geminiSetupText))
 if ($LASTEXITCODE -ne 0) {
     throw "Gemini-only setup did not complete successfully."
 }
