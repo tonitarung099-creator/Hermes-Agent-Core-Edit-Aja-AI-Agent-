@@ -71,8 +71,10 @@ def model_status(config: dict[str, Any] | None = None) -> str:
     ])
 
 
-def _entry_state(entry: Any, *, main_model: str, now: float) -> str:
-    from agent.credential_pool import STATUS_DEAD, STATUS_EXHAUSTED
+def _entry_state(
+    entry: Any, *, main_model: str, now: float, sole_credential: bool = False
+) -> str:
+    from agent.credential_pool import STATUS_DEAD, STATUS_EXHAUSTED, _exhausted_until
 
     if getattr(entry, "last_status", None) == STATUS_DEAD:
         return "DEAD"
@@ -83,12 +85,8 @@ def _entry_state(entry: Any, *, main_model: str, now: float) -> str:
         return "COOLDOWN"
 
     if getattr(entry, "last_status", None) == STATUS_EXHAUSTED:
-        reset_at = getattr(entry, "last_error_reset_at", None)
-        if not isinstance(reset_at, (int, float)) or reset_at > now:
-            return "COOLDOWN"
-        # A reset timestamp in the past means the provider's own retry window
-        # has elapsed; Hermes may select it again.
-        return "READY"
+        exhausted_until = _exhausted_until(entry, sole_credential=sole_credential)
+        return "COOLDOWN" if exhausted_until is None or exhausted_until > now else "READY"
 
     return "READY"
 
@@ -107,13 +105,17 @@ def api_snapshot(config: dict[str, Any] | None = None) -> dict[str, Any]:
         entries = []
 
     now = time.time()
+    non_dead_count = sum(getattr(entry, "last_status", None) != "dead" for entry in entries)
+    sole_credential = non_dead_count <= 1
     rows: list[dict[str, Any]] = []
     for index, entry in enumerate(entries, start=1):
         rows.append({
             "index": index,
             "label": str(getattr(entry, "label", "") or f"Gemini {index:02d}"),
             "priority": int(getattr(entry, "priority", index - 1) or 0),
-            "state": _entry_state(entry, main_model=main_model, now=now),
+            "state": _entry_state(
+                entry, main_model=main_model, now=now, sole_credential=sole_credential
+            ),
             "request_count": int(getattr(entry, "request_count", 0) or 0),
         })
 
