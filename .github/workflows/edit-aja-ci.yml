@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - edit-aja-cerebras-free-cloud
+      - edit-aja-free-cloud-hardening
       - edit-aja-local-command-router
   pull_request:
 
@@ -35,6 +36,7 @@ jobs:
         run: |
           pytest -q \
             tests/hermes_cli/test_edit_aja_free_cloud_mode.py \
+            tests/hermes_cli/test_edit_aja_free_cloud_runtime.py \
             tests/gateway/test_edit_aja_local_router.py \
             tests/gateway/test_display_config.py \
             tests/gateway/test_verbose_command.py \
@@ -63,6 +65,14 @@ jobs:
           $legacy = Get-Content scripts/configure-edit-aja-gemini.ps1 -Raw
           if ($legacy.Contains('auth add gemini')) {
             throw "Legacy compatibility wrapper must never add Gemini credentials."
+          }
+
+          $freeCloud = Get-Content scripts/configure-edit-aja-free-cloud.ps1 -Raw
+          if (-not $freeCloud.Contains('$providersToList = @("cerebras")')) {
+            throw "Free-cloud setup must build its credential-pool status list from configured providers."
+          }
+          if (-not $freeCloud.Contains('$providersToList += "cloudflare"')) {
+            throw "Free-cloud setup must include Cloudflare status only when Cloudflare is configured."
           }
 
           Write-Host "PowerShell syntax and non-Gemini bootstrap checks OK"
