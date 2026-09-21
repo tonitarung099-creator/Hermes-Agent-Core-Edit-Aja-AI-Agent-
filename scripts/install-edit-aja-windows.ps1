@@ -1,5 +1,5 @@
 # Edit Aja AI Agent - Windows bootstrap
-# Installs the Edit Aja Hermes fork, configures Gemini + messaging, and enables auto-start.
+# Installs the Edit Aja Hermes fork, configures free-cloud AI + messaging, and enables auto-start.
 # No secrets are hard-coded in this file.
 
 param(
@@ -52,7 +52,7 @@ Write-Host "Large caches     : $cacheRoot"
 Write-Host ""
 Write-Host "This setup will:"
 Write-Host "  1. Install the Edit Aja Hermes fork"
-Write-Host "  2. Configure Gemini-only AI + your local Gemini key pool"
+Write-Host "  2. Configure Cerebras-first AI + optional Cloudflare/Groq fallback"
 Write-Host "  3. Configure the Telegram gateway"
 Write-Host "  4. Start Hermes automatically when you log in to Windows"
 Write-Host ""
@@ -74,15 +74,15 @@ if (-not (Test-Path -LiteralPath $hermes)) {
 }
 
 Write-Host ""
-Write-Host "[2/4] Gemini-only AI setup..."
-$geminiSetup = Join-Path $installDir "scripts\configure-edit-aja-gemini.ps1"
-if (-not (Test-Path -LiteralPath $geminiSetup)) {
-    throw "Gemini setup helper was not found at $geminiSetup"
+Write-Host "[2/4] Cerebras-first free-cloud AI setup..."
+$aiSetup = Join-Path $installDir "scripts\configure-edit-aja-free-cloud.ps1"
+if (-not (Test-Path -LiteralPath $aiSetup)) {
+    throw "Free-cloud setup helper was not found at $aiSetup"
 }
-$geminiSetupText = Get-Content -LiteralPath $geminiSetup -Raw
-& ([scriptblock]::Create($geminiSetupText))
+$aiSetupText = Get-Content -LiteralPath $aiSetup -Raw
+& ([scriptblock]::Create($aiSetupText))
 if ($LASTEXITCODE -ne 0) {
-    throw "Gemini-only setup did not complete successfully."
+    throw "Free-cloud AI setup did not complete successfully."
 }
 
 Write-Host ""

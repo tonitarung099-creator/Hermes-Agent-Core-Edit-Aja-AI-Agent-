@@ -135,7 +135,7 @@ COMMAND_REGISTRY: list[CommandDef] = [
                args_hint="[text | remove N | clear]", busy_policy="dispatch"),
     CommandDef("status", "Show session, model, token, and context info", "Session",
                busy_policy="dispatch"),
-    CommandDef("api", "Show Edit Aja Gemini API key pool health", "Info",
+    CommandDef("api", "Show Edit Aja free-cloud API key pool health", "Info",
                gateway_only=True, busy_policy="dispatch", desktop="hidden"),
     CommandDef("egress", "Show Docker egress proxy status", "Session",
                args_hint="[status]", subcommands=("status",), busy_policy="dispatch",

@@ -20,93 +20,124 @@ from gateway.slash_commands_status import GatewayStatusCommandsMixin
 
 def _config():
     return {
-        "edit_aja": {"enabled": True, "quiet_mode": True},
+        "edit_aja": {
+            "enabled": True,
+            "quiet_mode": True,
+            "ai_profile": "cerebras-free-cloud",
+            "gemini_enabled": False,
+        },
         "model": {
-            "provider": "gemini",
-            "default": "gemini-3.7-flash",
+            "provider": "cerebras",
+            "default": "gpt-oss-120b",
         },
-        "auxiliary": {
-            "compression": {
-                "provider": "main",
-                "model": "gemini-3.5-flash-lite",
-            }
-        },
+        "fallback_providers": [
+            {"provider": "cloudflare", "model": "@cf/zai-org/glm-4.7-flash"},
+            {"provider": "groq", "model": "openai/gpt-oss-120b"},
+        ],
+    }
+
+
+def _snapshot():
+    return {
+        "providers": [],
+        "rows": [],
+        "total": 3,
+        "ready": 2,
+        "cooldown": 1,
+        "dead": 0,
     }
 
 
 def test_local_intent_is_conservative():
     assert local_intent("model yang kamu pakai apa?") == "model"
     assert local_intent("api saya ada berapa?") == "api"
+    assert local_intent("status api cerebras") == "api"
     assert local_intent("gateway hidup?") == "status"
     assert local_intent("/model") is None
-    assert local_intent("jelaskan cara kerja Gemini API") is None
+    assert local_intent("jelaskan cara kerja Cerebras API") is None
     assert local_intent("buat analisis model video ini secara detail") is None
 
 
 def test_model_and_compact_status_are_local_and_specific(monkeypatch):
-    monkeypatch.setattr(
-        "gateway.edit_aja_local.api_snapshot",
-        lambda _cfg=None: {
-            "rows": [],
-            "total": 2,
-            "ready": 2,
-            "cooldown": 0,
-            "dead": 0,
-            "preferred": "Gemini 01",
-        },
-    )
+    monkeypatch.setattr("gateway.edit_aja_local.api_snapshot", lambda _cfg=None: _snapshot())
     cfg = _config()
 
     model = model_status(cfg)
-    assert "gemini-3.7-flash" in model
-    assert "gemini-3.5-flash-lite" in model
-    assert "gemini" in model.lower()
+    assert "cerebras" in model.lower()
+    assert "gpt-oss-120b" in model
+    assert "cloudflare" in model.lower()
+    assert "groq" in model.lower()
+    assert "Gemini: **DISABLED**" in model
 
     status = compact_status(cfg)
     assert "Gateway: **ONLINE**" in status
-    assert "Gemini keys: **2**" in status
+    assert "API credentials: **3**" in status
+    assert "Fallbacks: **cloudflare → groq**" in status
+    assert "Gemini: **DISABLED**" in status
     assert "Quiet mode: **ON**" in status
 
 
-def test_api_status_reports_pool_health_without_secrets_or_fake_percent(monkeypatch):
+def test_api_status_reports_all_route_pools_without_secrets_or_fake_percent(monkeypatch):
     now = time.time()
-    entries = [
-        SimpleNamespace(
-            label="Gemini 01",
-            priority=0,
-            last_status="ok",
-            last_error_reset_at=None,
-            model_cooldowns={},
-            request_count=5,
-            access_token="secret-one",
-        ),
-        SimpleNamespace(
-            label="Gemini 02",
-            priority=1,
-            last_status="exhausted",
-            last_error_reset_at=now + 600,
-            model_cooldowns={},
-            request_count=2,
-            access_token="secret-two",
-        ),
-    ]
+    pools = {
+        "cerebras": [
+            SimpleNamespace(
+                label="Cerebras 01",
+                priority=0,
+                last_status="ok",
+                last_error_reset_at=None,
+                model_cooldowns={},
+                request_count=5,
+                access_token="secret-cerebras",
+            )
+        ],
+        "cloudflare": [
+            SimpleNamespace(
+                label="Cloudflare 01",
+                priority=0,
+                last_status="exhausted",
+                last_error_reset_at=now + 600,
+                model_cooldowns={},
+                request_count=2,
+                access_token="secret-cloudflare",
+            )
+        ],
+        "groq": [
+            SimpleNamespace(
+                label="Groq 01",
+                priority=0,
+                last_status="ok",
+                last_error_reset_at=None,
+                model_cooldowns={},
+                request_count=1,
+                access_token="secret-groq",
+            )
+        ],
+    }
 
     class FakePool:
-        def entries(self):
-            return list(entries)
+        def __init__(self, entries):
+            self._entries = entries
 
-    monkeypatch.setattr("agent.credential_pool.load_pool", lambda provider: FakePool())
+        def entries(self):
+            return list(self._entries)
+
+    monkeypatch.setattr(
+        "agent.credential_pool.load_pool",
+        lambda provider: FakePool(pools.get(provider, [])),
+    )
 
     text = api_status(_config())
 
-    assert "Keys: **2**" in text
-    assert "Gemini 01: **READY**" in text
-    assert "Gemini 02: **COOLDOWN**" in text
-    assert "not available reliably" in text
-    assert "secret-one" not in text
-    assert "secret-two" not in text
+    assert "Credentials: **3**" in text
+    assert "Cerebras 01: **READY**" in text
+    assert "Cloudflare 01: **COOLDOWN**" in text
+    assert "Groq 01: **READY**" in text
+    assert "secret-cerebras" not in text
+    assert "secret-cloudflare" not in text
+    assert "secret-groq" not in text
     assert "50%" not in text
-    assert "Preferred next key: **Gemini 01**" in text
+    assert "never invents a percentage" in text
 
 
 def test_quiet_mode_configures_telegram_final_answer_first():
@@ -132,42 +163,22 @@ def test_quiet_mode_configures_telegram_final_answer_first():
 
 
 def test_local_reply_requires_edit_aja_marker(monkeypatch):
-    monkeypatch.setattr(
-        "gateway.edit_aja_local.api_snapshot",
-        lambda _cfg=None: {
-            "rows": [],
-            "total": 2,
-            "ready": 2,
-            "cooldown": 0,
-            "dead": 0,
-            "preferred": "Gemini 01",
-        },
-    )
+    monkeypatch.setattr("gateway.edit_aja_local.api_snapshot", lambda _cfg=None: _snapshot())
+
     assert local_reply("model yang kamu pakai apa?", {}) is None
-    assert "gemini-3.7-flash" in local_reply("model yang kamu pakai apa?", _config())
-    assert "Gemini keys: **2**" in local_reply("agent hidup?", _config())
+    assert "gpt-oss-120b" in local_reply("model yang kamu pakai apa?", _config())
+    assert "API credentials: **3**" in local_reply("agent hidup?", _config())
 
 
 @pytest.mark.asyncio
 async def test_edit_aja_status_handler_returns_before_session_or_llm(monkeypatch):
     cfg = _config()
     monkeypatch.setattr("hermes_cli.config.load_config", lambda: cfg)
-    monkeypatch.setattr(
-        "gateway.edit_aja_local.api_snapshot",
-        lambda _cfg=None: {
-            "rows": [],
-            "total": 2,
-            "ready": 2,
-            "cooldown": 0,
-            "dead": 0,
-            "preferred": "Gemini 01",
-        },
-    )
+    monkeypatch.setattr("gateway.edit_aja_local.api_snapshot", lambda _cfg=None: _snapshot())
 
     runner = object.__new__(GatewayStatusCommandsMixin)
-    # Deliberately do not attach async_session_store. The Edit Aja fast path must
-    # return before upstream session/agent code is touched.
     result = await runner._handle_status_command(SimpleNamespace())
 
     assert "EDIT AJA AI AGENT" in result
-    assert "gemini-3.7-flash" in result
+    assert "gpt-oss-120b" in result
+    assert "cerebras" in result.lower()

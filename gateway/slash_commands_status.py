@@ -333,7 +333,7 @@ class GatewayStatusCommandsMixin:
         return "\n".join(lines)
 
     async def _handle_api_command(self, event: MessageEvent) -> str:
-        """Edit Aja /api — Gemini credential-pool health without an LLM call."""
+        """Edit Aja /api — active free-cloud credential-pool health without an LLM call."""
         try:
             from gateway.edit_aja_local import api_status
             return api_status()
