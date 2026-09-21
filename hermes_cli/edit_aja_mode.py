@@ -103,6 +103,12 @@ def build_edit_aja_gemini_config(
     strategies["gemini"] = "fill_first"
     cfg["credential_pool_strategies"] = strategies
 
+    # Edit Aja is designed as a personal Telegram assistant. Default its
+    # messaging surface to final-answer-first: internal tool/redirect chatter
+    # remains available in local logs and can be re-enabled with /debug on.
+    from gateway.edit_aja_local import apply_quiet_mode
+    cfg = apply_quiet_mode(cfg, True)
+
     return cfg
 
 
