@@ -1,0 +1,68 @@
+name: Import Hermes Agent baseline
+
+on:
+  push:
+    paths:
+      - ".github/workflows/import-hermes-baseline.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    if: github.repository == 'tonitarung099-creator/Hermes-Agent-Core-Edit-Aja-AI-Agent-'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout target repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch pinned Hermes Agent upstream snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/hermes-agent
+          git init /tmp/hermes-agent
+          git -C /tmp/hermes-agent remote add origin https://github.com/NousResearch/hermes-agent.git
+          git -C /tmp/hermes-agent fetch --depth=1 origin afc3b7c6f397c6d21fd2c129ca17b18b544dd8dc
+          git -C /tmp/hermes-agent checkout --detach FETCH_HEAD
+
+      - name: Replace target with Hermes source snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Keep only this repository's .git metadata.
+          find . -mindepth 1 -maxdepth 1 ! -name ".git" -exec rm -rf {} +
+
+          # Copy source, but intentionally do not import upstream CI workflows yet.
+          # We will add Edit Aja-specific CI after the baseline is stable.
+          rsync -a             --exclude=".git/"             --exclude=".github/workflows/"             /tmp/hermes-agent/ ./
+
+          mkdir -p .github
+          cat > .github/EDIT_AJA_UPSTREAM.md <<'EOF'
+          # Edit Aja Hermes Baseline
+
+          This repository started from a source snapshot of:
+
+          - Upstream: https://github.com/NousResearch/hermes-agent
+          - Upstream commit: `afc3b7c6f397c6d21fd2c129ca17b18b544dd8dc`
+          - Imported for: **Hermes Agent Core → Edit Aja AI Agent**
+          - Import strategy: source snapshot only; upstream Git history and upstream GitHub Actions workflows were intentionally not copied.
+
+          The original upstream license and copyright notices remain in the imported source.
+          EOF
+
+      - name: Commit imported baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "Edit Aja Import Bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore: import Hermes Agent upstream baseline"
+          git push origin HEAD:main
