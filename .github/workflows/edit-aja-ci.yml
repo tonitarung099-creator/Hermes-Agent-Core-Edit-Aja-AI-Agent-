@@ -38,5 +38,13 @@ jobs:
         shell: pwsh
         run: |
           [scriptblock]::Create((Get-Content scripts/configure-edit-aja-gemini.ps1 -Raw)) | Out-Null
-          [scriptblock]::Create((Get-Content scripts/install-edit-aja-windows.ps1 -Raw)) | Out-Null
-          Write-Host "PowerShell syntax OK"
+          $bootstrap = Get-Content scripts/install-edit-aja-windows.ps1 -Raw
+          [scriptblock]::Create($bootstrap) | Out-Null
+          $directInvoke = @($bootstrap -split "\n" | Where-Object { $_.Trim() -eq '& $geminiSetup' })
+          if ($directInvoke.Count -gt 0) {
+            throw "Bootstrap executes configure-edit-aja-gemini.ps1 directly and can be blocked by Windows ExecutionPolicy."
+          }
+          if (-not $bootstrap.Contains('[scriptblock]::Create($geminiSetupText)')) {
+            throw "Bootstrap must invoke the Gemini setup from an in-memory ScriptBlock."
+          }
+          Write-Host "PowerShell syntax and execution-policy-safe invocation OK"
