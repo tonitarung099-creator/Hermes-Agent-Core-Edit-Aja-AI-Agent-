@@ -39,6 +39,7 @@ jobs:
             tests/gateway/test_edit_aja_local_router.py \
             tests/gateway/test_display_config.py \
             tests/gateway/test_verbose_command.py \
+            tests/gateway/test_busy_session_ack.py \
             tests/hermes_cli/test_desktop_slash_registry.py
 
       - name: Parse Windows setup scripts
