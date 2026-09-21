@@ -505,6 +505,18 @@ class GatewayModelCommandsMixin:
         from gateway.run import _hermes_home
         from hermes_cli.model_switch import parse_model_switch_args, resolve_persist_behavior
 
+        # Edit Aja uses bare /model as a fast local status command. Model switching
+        # still works exactly as upstream when any argument is supplied.
+        if not (event.get_command_args() or "").strip():
+            try:
+                from hermes_cli.config import load_config
+                from gateway.edit_aja_local import edit_aja_enabled, model_status
+                _edit_aja_cfg = load_config()
+                if edit_aja_enabled(_edit_aja_cfg):
+                    return model_status(_edit_aja_cfg)
+            except Exception:
+                logger.debug("Edit Aja local /model failed; falling back to model picker", exc_info=True)
+
         profile_home = None
         if getattr(getattr(self, "config", None), "multiplex_profiles", False):
             profile_home = self._resolve_profile_home_for_source(event.source)
