@@ -85,8 +85,16 @@ if (Ask-YesNo "Add a Groq API key now?" $true) {
 
 Write-Host ""
 Write-Host "Configured credential pools:"
-foreach ($provider in @("cerebras", "cloudflare", "groq")) {
+$providersToList = @("cerebras")
+if (-not [string]::IsNullOrWhiteSpace($CloudflareAccountId)) {
+    $providersToList += "cloudflare"
+}
+$providersToList += "groq"
+foreach ($provider in $providersToList) {
     & $hermes auth list $provider
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "Could not read the $provider credential pool. The provider configuration was kept; you can retry with: hermes auth list $provider"
+    }
 }
 
 Write-Host ""
