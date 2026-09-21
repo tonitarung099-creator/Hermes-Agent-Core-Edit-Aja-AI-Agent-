@@ -8,6 +8,7 @@ from hermes_cli.edit_aja_mode import (
     CEREBRAS_BASE_URL,
     CLOUDFLARE_BASE_URL_TEMPLATE,
     DEFAULT_CLOUDFLARE_MODEL,
+    DEFAULT_CLOUDFLARE_VISION_MODEL,
     DEFAULT_GROQ_MODEL,
     DEFAULT_MAIN_MODEL,
     GROQ_BASE_URL,
@@ -60,6 +61,8 @@ def test_free_cloud_profile_uses_cerebras_and_never_routes_to_gemini():
         CLOUDFLARE_BASE_URL_TEMPLATE.format(account_id="abcdef1234567890")
     )
     assert cfg["providers"]["cloudflare"]["default_model"] == DEFAULT_CLOUDFLARE_MODEL
+    assert DEFAULT_CLOUDFLARE_VISION_MODEL in cfg["providers"]["cloudflare"]["models"]
+    assert cfg["providers"]["cloudflare"]["models"][DEFAULT_CLOUDFLARE_VISION_MODEL]["context_length"] == 256_000
     assert cfg["providers"]["groq"]["api"] == GROQ_BASE_URL
     assert cfg["providers"]["groq"]["default_model"] == DEFAULT_GROQ_MODEL
 
@@ -70,8 +73,8 @@ def test_free_cloud_profile_uses_cerebras_and_never_routes_to_gemini():
     assert "fallback_model" not in cfg
     assert all(row["provider"] != "gemini" for row in cfg["fallback_providers"])
 
-    assert cfg["auxiliary"]["vision"]["provider"] == "main"
-    assert cfg["auxiliary"]["vision"]["model"] == DEFAULT_MAIN_MODEL
+    assert cfg["auxiliary"]["vision"]["provider"] == "cloudflare"
+    assert cfg["auxiliary"]["vision"]["model"] == DEFAULT_CLOUDFLARE_VISION_MODEL
     assert "api_key" not in cfg["auxiliary"]["vision"]
     assert "fallback_chain" not in cfg["auxiliary"]["vision"]
 
@@ -96,6 +99,8 @@ def test_cloudflare_is_optional_but_groq_stays_available():
     cfg = build_edit_aja_free_cloud_config({})
 
     assert "cloudflare" not in cfg["providers"]
+    assert cfg["auxiliary"]["vision"]["provider"] == "main"
+    assert cfg["auxiliary"]["vision"]["model"] == DEFAULT_MAIN_MODEL
     assert cfg["fallback_providers"] == [
         {"provider": "groq", "model": DEFAULT_GROQ_MODEL},
     ]
