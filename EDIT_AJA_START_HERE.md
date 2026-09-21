@@ -28,7 +28,36 @@ Open **PowerShell** and run:
 iex (irm https://raw.githubusercontent.com/tonitarung099-creator/Hermes-Agent-Core-Edit-Aja-AI-Agent-/main/scripts/install-edit-aja-windows.ps1)
 ```
 
-The setup is interactive. It installs the fork, runs Hermes setup, asks for Telegram configuration, registers gateway auto-start, and starts the gateway.
+The setup is interactive. It installs the fork, configures **Gemini-only Edit Aja mode**, lets you add Gemini API keys through Hermes' masked credential prompt, asks for Telegram configuration, registers gateway auto-start, and starts the gateway.
+
+## Gemini preparation
+
+Create at least one Gemini API key in Google AI Studio before installing. The Edit Aja fork accepts **Gemini Free Tier** keys; it does not require billing.
+
+During setup, each key is entered through Hermes' masked prompt and stored locally in its credential pool. Keys are never committed to GitHub.
+
+You can add another independently authorized key later with:
+
+```powershell
+hermes auth add gemini --type api-key --label "Gemini 02"
+```
+
+Inspect the pool with:
+
+```powershell
+hermes auth list gemini
+hermes auth status gemini
+```
+
+Edit Aja uses `fill_first`: one preferred credential stays stable and Hermes' existing health/cooldown logic can move away from a credential that is unavailable. Respect Google's account and quota terms; do not use credential pools to circumvent provider limits.
+
+Default routing installed by Edit Aja:
+
+- Main reasoning / agent model: `gemini-3.7-flash`
+- Lightweight side tasks: `gemini-3.5-flash-lite`
+- Vision/review-heavy tasks: main Gemini model
+- Other cloud-provider fallback chain: disabled
+- Local tools remain preferred for deterministic computer work
 
 ## Telegram preparation
 
@@ -62,7 +91,8 @@ Keep the project progression in this order:
 
 **Phase 1 — Foundation**
 - Windows installation
-- model/provider setup
+- Gemini-only provider setup
+- local Gemini credential pool
 - Telegram private access
 - gateway auto-start
 - local command execution

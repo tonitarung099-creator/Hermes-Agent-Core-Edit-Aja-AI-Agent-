@@ -1,4 +1,4 @@
-"""Tests for Gemini free-tier detection and blocking."""
+"""Tests for Gemini free-tier detection and Edit Aja quota guidance."""
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -88,7 +88,9 @@ class TestGeminiHttpErrorFreeTierGuidance:
         err = gemini_http_error(self._FakeResp(429, body))
         msg = str(err)
         assert "free tier" in msg.lower()
-        assert "aistudio.google.com/apikey" in msg
+        assert "billing is not required" in msg.lower()
+        assert "hermes auth list gemini" in msg
+        assert "enable billing" not in msg.lower()
 
     def test_paid_429_has_no_billing_url(self):
         body = '{"error":{"code":429,"message":"Rate limited","status":"RESOURCE_EXHAUSTED"}}'

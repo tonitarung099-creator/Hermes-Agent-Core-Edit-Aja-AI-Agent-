@@ -46,10 +46,11 @@ VERTEX_EXPRESS_BASE_URL = "https://aiplatform.googleapis.com/v1beta1/publishers/
 GEMINI_DEFAULT_MAX_OUTPUT_TOKENS = 65535
 
 _FREE_TIER_GUIDANCE = (
-    "\n\nYour Google API key is on the free tier (a few hundred requests/day for Gemini Flash models). "
-    "Hermes typically makes 3-10 API calls per user turn, so the free tier is exhausted in a handful of "
-    "messages and cannot sustain an agent session. Enable billing on your Google Cloud project and "
-    "regenerate the key in a billing-enabled project: https://aistudio.google.com/apikey"
+    "\n\nThis Google API key is on the Gemini free tier and has reached its current quota. "
+    "Edit Aja AI Agent supports free-tier Gemini keys; billing is not required. Wait for Google's "
+    "quota window to reset, or use another independently authorized Gemini credential already stored "
+    "in the Hermes credential pool. Inspect the pool with `hermes auth list gemini` and "
+    "`hermes auth status gemini`. Respect Google's account and quota terms."
 )
 _STANDARD_KEY_GUIDANCE = (
     "\n\nGoogle Gemini rejected this API key's type — you do NOT need OAuth. Google began rejecting legacy "
