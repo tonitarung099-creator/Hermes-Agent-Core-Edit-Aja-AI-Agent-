@@ -30,6 +30,18 @@ iex (irm https://raw.githubusercontent.com/tonitarung099-creator/Hermes-Agent-Co
 
 The setup is interactive. It installs the fork, configures **Gemini-only Edit Aja mode**, lets you add Gemini API keys through Hermes' masked credential prompt, asks for Telegram configuration, registers gateway auto-start, and starts the gateway.
 
+### Install on drive D (recommended when C is low on space)
+
+The Edit Aja bootstrap supports a custom Hermes home. To put the agent, runtime, repository checkout, and large install caches on drive D:
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/tonitarung099-creator/Hermes-Agent-Core-Edit-Aja-AI-Agent-/main/scripts/install-edit-aja-windows.ps1))) -HermesHome "D:\\EditAjaAI"
+```
+
+This keeps Hermes under `D:\\EditAjaAI` and also redirects the install-time uv/npm/Electron caches plus the persistent Playwright browser download to that location. The installer changes TEMP/TMP only for its own PowerShell process; it does not move Windows' global temp folder.
+
+After installation, `HERMES_HOME` is persisted for the Windows user so gateway/autostart processes continue using the D: installation after reboot.
+
 ## Gemini preparation
 
 Create at least one Gemini API key in Google AI Studio before installing. The Edit Aja fork accepts **Gemini Free Tier** keys; it does not require billing.
