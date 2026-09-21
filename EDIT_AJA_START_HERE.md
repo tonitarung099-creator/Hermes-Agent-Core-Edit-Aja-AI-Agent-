@@ -28,7 +28,7 @@ Open **PowerShell** and run:
 iex (irm https://raw.githubusercontent.com/tonitarung099-creator/Hermes-Agent-Core-Edit-Aja-AI-Agent-/main/scripts/install-edit-aja-windows.ps1)
 ```
 
-The setup is interactive. It installs the fork, configures **Gemini-only Edit Aja mode**, lets you add Gemini API keys through Hermes' masked credential prompt, asks for Telegram configuration, registers gateway auto-start, and starts the gateway.
+The setup is interactive. It installs the fork, configures **Cerebras-first Edit Aja mode**, lets you add Cerebras plus optional Cloudflare/Groq credentials through Hermes' masked credential prompt, asks for Telegram configuration, registers gateway auto-start, and starts the gateway.
 
 ### Install on drive D (recommended when C is low on space)
 
@@ -42,34 +42,45 @@ This keeps Hermes under `D:\\EditAjaAI` and also redirects the install-time uv/n
 
 After installation, `HERMES_HOME` is persisted for the Windows user so gateway/autostart processes continue using the D: installation after reboot.
 
-## Gemini preparation
+## AI provider preparation
 
-Create at least one Gemini API key in Google AI Studio before installing. The Edit Aja fork accepts **Gemini Free Tier** keys; it does not require billing.
+Edit Aja no longer uses Gemini in its active routing profile.
 
-During setup, each key is entered through Hermes' masked prompt and stored locally in its credential pool. Keys are never committed to GitHub.
+Default routing:
 
-You can add another independently authorized key later with:
+- Primary: **Cerebras** — `gpt-oss-120b`
+- Fallback 1: **Cloudflare Workers AI** — `@cf/zai-org/glm-4.7-flash` when a Cloudflare Account ID + API token are configured
+- Fallback 2: **Groq** — `openai/gpt-oss-120b`
+- Gemini: **disabled for Edit Aja routing**
+- API retry count: **1** per provider call
+- Automatic post-exhaustion retry loops: **disabled**
+- Deterministic/local tools remain preferred before any LLM call
+
+Create a Cerebras API key before setup. Cloudflare and Groq are optional fallbacks, but configuring them gives the agent a separate provider to use if Cerebras is unavailable.
+
+Credentials are entered through Hermes' masked prompt and stored locally in Hermes' credential pool. They are never committed to GitHub.
+
+Inspect the pools with:
 
 ```powershell
-hermes auth add gemini --type api-key --label "Gemini 02"
+hermes auth list cerebras
+hermes auth list cloudflare
+hermes auth list groq
 ```
 
-Inspect the pool with:
+For Cloudflare Workers AI, the setup also asks for your **Cloudflare Account ID** because the OpenAI-compatible endpoint includes it in the URL.
+
+### Existing installation: switch away from Gemini
+
+After updating the repository, run:
 
 ```powershell
-hermes auth list gemini
-hermes auth status gemini
+$env:HERMES_HOME="D:\EditAjaAI"
+$setup="D:\EditAjaAI\hermes-agent\scripts\configure-edit-aja-free-cloud.ps1"
+& ([scriptblock]::Create((Get-Content -LiteralPath $setup -Raw)))
 ```
 
-Edit Aja uses `fill_first`: one preferred credential stays stable and Hermes' existing health/cooldown logic can move away from a credential that is unavailable. Respect Google's account and quota terms; do not use credential pools to circumvent provider limits.
-
-Default routing installed by Edit Aja:
-
-- Main reasoning / agent model: `gemini-3.7-flash`
-- Lightweight side tasks: `gemini-3.5-flash-lite`
-- Vision/review-heavy tasks: main Gemini model
-- Other cloud-provider fallback chain: disabled
-- Local tools remain preferred for deterministic computer work
+The script rewrites Edit Aja routing to Cerebras/Cloudflare/Groq. Existing Gemini credentials may remain stored locally, but the Edit Aja profile will not route requests to them.
 
 ## Telegram preparation
 
@@ -82,7 +93,7 @@ Before running the installer:
 5. Keep the bot token private.
 6. Get your numeric Telegram user ID (for the Hermes allowlist).
 
-Never commit Telegram bot tokens, Gemini keys, or any other secret to this repository.
+Never commit Telegram bot tokens, AI provider keys/tokens, or any other secret to this repository.
 
 ## After setup
 
@@ -103,8 +114,8 @@ Keep the project progression in this order:
 
 **Phase 1 — Foundation**
 - Windows installation
-- Gemini-only provider setup
-- local Gemini credential pool
+- Cerebras-first provider setup
+- optional Cloudflare/Groq fallback pools
 - Telegram private access
 - gateway auto-start
 - local command execution
@@ -135,12 +146,12 @@ The core rule is: **use deterministic/local tools first; call an LLM only when r
 
 ## Edit Aja local commands
 
-These commands are handled locally by the gateway and do not need a Gemini reasoning turn:
+These commands are handled locally by the gateway and do not need an LLM reasoning turn:
 
 ```text
 /status        Compact Edit Aja runtime status
-/model         Current Gemini main/light models
-/api           Gemini credential-pool health (READY / COOLDOWN / DEAD)
+/model         Current primary + fallback model routes
+/api           Cerebras/Cloudflare/Groq pool health (READY / COOLDOWN / DEAD)
 /quiet on      Final-answer-first Telegram mode
 /quiet off     Show technical progress again
 /debug on      Alias for technical/debug display
@@ -149,7 +160,7 @@ These commands are handled locally by the gateway and do not need a Gemini reaso
 
 Natural-language status questions such as **"model yang kamu pakai apa?"**, **"api saya ada berapa?"**, and **"gateway hidup?"** are also answered by the local router when Edit Aja mode is enabled.
 
-The API status intentionally does **not** invent a remaining-quota percentage. Gemini does not provide a reliable per-key percentage through the inference path used here, so Edit Aja reports only locally observed credential health.
+The API status intentionally does **not** invent a remaining-quota percentage. Edit Aja reports locally observed credential health and provider errors instead of making up a quota percentage.
 
 Quiet Mode is the Edit Aja default. Tool calls, redirect/queue acknowledgements, interim scratch messages, and long-running technical chatter are hidden from Telegram while final answers remain visible. Technical details remain available in local logs and can be shown again with `/debug on`.
 
