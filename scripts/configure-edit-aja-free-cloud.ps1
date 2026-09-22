@@ -1,6 +1,6 @@
 # Edit Aja AI Agent - recurring-free cloud configuration
-# Primary: Cerebras GPT-OSS 120B
-# Fallback: Cloudflare Workers AI (optional vision/free pool) -> Groq
+# Primary: Groq GPT-OSS 120B
+# Fallback: Cloudflare Workers AI (optional vision/free pool)
 # Gemini is not used by this profile.
 
 param(
@@ -32,11 +32,11 @@ function Ask-YesNo([string]$Prompt, [bool]$DefaultYes = $true) {
 
 Write-Host ""
 Write-Host "============================================================"
-Write-Host " Edit Aja AI Agent - Cerebras Free Cloud Setup"
+Write-Host " Edit Aja AI Agent - Groq + Cloudflare Free Setup"
 Write-Host "============================================================"
 Write-Host ""
-Write-Host "Primary : Cerebras / $MainModel"
-Write-Host "Fallback: Cloudflare Workers AI (optional) -> Groq"
+Write-Host "Primary : Groq / $GroqModel"
+Write-Host "Fallback: Cloudflare Workers AI (optional)"
 Write-Host "Gemini  : DISABLED for Edit Aja routing"
 Write-Host ""
 Write-Host "API keys are stored by Hermes locally and are not written to GitHub."
@@ -60,7 +60,7 @@ if (-not [string]::IsNullOrWhiteSpace($CloudflareAccountId)) {
 }
 
 Write-Host ""
-Write-Host "Applying Cerebras-first Edit Aja routing..."
+Write-Host "Applying Groq-first Edit Aja routing..."
 & $python @argsList
 if ($LASTEXITCODE -ne 0) {
     throw "Could not apply Edit Aja free-cloud configuration."
@@ -69,11 +69,11 @@ if ($LASTEXITCODE -ne 0) {
 $providersToList = @()
 
 Write-Host ""
-if (Ask-YesNo "Add a Cerebras API key now?" $true) {
-    & $hermes auth add cerebras --type api-key --label "Cerebras 01"
-    if ($LASTEXITCODE -ne 0) { throw "Could not add the Cerebras API key." }
+if (Ask-YesNo "Add a Groq API key now?" $true) {
+    & $hermes auth add groq --type api-key --label "Groq 01"
+    if ($LASTEXITCODE -ne 0) { throw "Could not add the Groq API key." }
 }
-$providersToList += "cerebras"
+$providersToList += "groq"
 
 if (-not [string]::IsNullOrWhiteSpace($CloudflareAccountId)) {
     Write-Host ""
@@ -83,13 +83,6 @@ if (-not [string]::IsNullOrWhiteSpace($CloudflareAccountId)) {
     }
     $providersToList += "cloudflare"
 }
-
-Write-Host ""
-if (Ask-YesNo "Add a Groq API key now?" $true) {
-    & $hermes auth add groq --type api-key --label "Groq 01"
-    if ($LASTEXITCODE -ne 0) { throw "Could not add the Groq API key." }
-}
-$providersToList += "groq"
 
 Write-Host ""
 Write-Host "Configured active credential pools:"
@@ -102,10 +95,11 @@ foreach ($provider in $providersToList) {
 
 Write-Host ""
 Write-Host "Recurring-free setup complete."
-Write-Host "Primary : cerebras / $MainModel"
+Write-Host "Primary : groq / $GroqModel"
 if (-not [string]::IsNullOrWhiteSpace($CloudflareAccountId)) {
-    Write-Host "Fallback: cloudflare / $CloudflareModel -> groq / $GroqModel"
+    Write-Host "Fallback: cloudflare / $CloudflareModel"
 } else {
-    Write-Host "Fallback: groq / $GroqModel"
+    Write-Host "Fallback: none (Cloudflare skipped)"
 }
 Write-Host "Gemini  : disabled for Edit Aja routing"
+Write-Host "Cerebras: disabled for Edit Aja routing"
