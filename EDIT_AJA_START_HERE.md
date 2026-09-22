@@ -28,7 +28,7 @@ Open **PowerShell** and run:
 iex (irm https://raw.githubusercontent.com/tonitarung099-creator/Hermes-Agent-Core-Edit-Aja-AI-Agent-/main/scripts/install-edit-aja-windows.ps1)
 ```
 
-The setup is interactive. It installs the fork, configures **Cerebras-first recurring-free Edit Aja mode**, lets you add Cloudflare and Groq credentials through Hermes' masked credential prompt, asks for Telegram configuration, registers gateway auto-start, and starts the gateway.
+The setup is interactive. It installs the fork, configures **Cerebras-first recurring-free Edit Aja mode**, lets you add Cerebras and Groq credentials through Hermes' masked credential prompt (plus optional Cloudflare), asks for Telegram configuration, registers gateway auto-start, and starts the gateway.
 
 ### Install on drive D (recommended when C is low on space)
 
@@ -48,8 +48,6 @@ Edit Aja no longer uses Gemini in its active routing profile.
 
 Default routing:
 
-- Primary: **Cloudflare Workers AI** — `@cf/zai-org/glm-4.7-flash`
-- Vision/screenshots: **Cloudflare Gemma 4 26B** — `@cf/google/gemma-4-26b-a4b-it`
 - Primary: **Cerebras** — `gpt-oss-120b`
 - Optional extra free pool + vision: **Cloudflare Workers AI** — `@cf/zai-org/glm-4.7-flash` plus Gemma vision
 - Fallback: **Groq** — `openai/gpt-oss-120b`
@@ -65,6 +63,7 @@ Credentials are entered through Hermes' masked prompt and stored locally in Herm
 Inspect the pools with:
 
 ```powershell
+hermes auth list cerebras
 hermes auth list cloudflare
 hermes auth list groq
 ```
@@ -73,7 +72,7 @@ For Cloudflare Workers AI, the setup asks for your **Cloudflare Account ID** bec
 
 ### Existing installation: switch away from Gemini
 
-For an existing Windows install, use the migration helper. It updates the fork, applies the Cloudflare-first recurring-free profile, restarts the gateway, and verifies status:
+For an existing Windows install, use the migration helper. It updates the fork, applies the Cerebras-first recurring-free profile, restarts the gateway, and verifies status:
 
 ```powershell
 & ([scriptblock]::Create((irm "https://raw.githubusercontent.com/tonitarung099-creator/Hermes-Agent-Core-Edit-Aja-AI-Agent-/main/scripts/switch-edit-aja-free-cloud.ps1"))) -HermesHome "D:\EditAjaAI"
@@ -150,7 +149,7 @@ These commands are handled locally by the gateway and do not need an LLM reasoni
 ```text
 /status        Compact Edit Aja runtime status
 /model         Current primary + fallback model routes
-/api           Cloudflare/Groq pool health (READY / COOLDOWN / DEAD)
+/api           Cerebras/Cloudflare/Groq pool health (READY / COOLDOWN / DEAD)
 /quiet on      Final-answer-first Telegram mode
 /quiet off     Show technical progress again
 /debug on      Alias for technical/debug display
