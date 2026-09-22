@@ -1,8 +1,8 @@
 """Runtime/auth integration checks for Edit Aja's recurring-free providers.
 
-These tests verify that Hermes treats Cloudflare and Groq as configured auth
-targets and can bind pooled credentials to their OpenAI-compatible routes.
-No network access is used.
+These tests verify that Hermes treats Cerebras, optional Cloudflare, and Groq
+as configured auth targets and can bind pooled credentials to their
+OpenAI-compatible routes. No network access is used.
 """
 
 from __future__ import annotations
@@ -12,9 +12,11 @@ from types import SimpleNamespace
 import pytest
 
 from hermes_cli.edit_aja_mode import (
+    CEREBRAS_BASE_URL,
     CLOUDFLARE_BASE_URL_TEMPLATE,
     DEFAULT_CLOUDFLARE_MODEL,
     DEFAULT_GROQ_MODEL,
+    DEFAULT_MAIN_MODEL,
     GROQ_BASE_URL,
     build_edit_aja_free_cloud_config,
 )
@@ -30,6 +32,7 @@ def _free_cloud_config():
 @pytest.mark.parametrize(
     ("provider", "expected_url"),
     [
+        ("cerebras", CEREBRAS_BASE_URL),
         (
             "cloudflare",
             CLOUDFLARE_BASE_URL_TEMPLATE.format(account_id="abcdef1234567890"),
@@ -59,6 +62,7 @@ def test_auth_cli_recognizes_edit_aja_named_providers(monkeypatch, provider, exp
 @pytest.mark.parametrize(
     ("provider", "model", "expected_url"),
     [
+        ("cerebras", DEFAULT_MAIN_MODEL, CEREBRAS_BASE_URL),
         (
             "cloudflare",
             DEFAULT_CLOUDFLARE_MODEL,
@@ -114,20 +118,18 @@ def test_runtime_resolves_edit_aja_provider_from_credential_pool(
     assert runtime["source"] == f"pool:{provider}"
 
 
-def test_recurring_free_primary_and_fallback_order_excludes_gemini_and_cerebras():
+def test_recurring_free_primary_and_fallback_order_uses_cerebras_and_excludes_gemini():
     cfg = _free_cloud_config()
 
     assert cfg["model"] == {
-        "provider": "cloudflare",
-        "default": DEFAULT_CLOUDFLARE_MODEL,
+        "provider": "cerebras",
+        "default": DEFAULT_MAIN_MODEL,
     }
     assert cfg["fallback_providers"] == [
+        {"provider": "cloudflare", "model": DEFAULT_CLOUDFLARE_MODEL},
         {"provider": "groq", "model": DEFAULT_GROQ_MODEL},
     ]
-    assert "cerebras" not in cfg["providers"]
+    assert cfg["providers"]["cerebras"]["api"] == CEREBRAS_BASE_URL
     assert cfg["edit_aja"]["gemini_enabled"] is False
-    assert cfg["edit_aja"]["cerebras_enabled"] is False
-    assert all(
-        row["provider"] not in {"gemini", "cerebras"}
-        for row in cfg["fallback_providers"]
-    )
+    assert cfg["edit_aja"]["cerebras_enabled"] is True
+    assert all(row["provider"] != "gemini" for row in cfg["fallback_providers"])
