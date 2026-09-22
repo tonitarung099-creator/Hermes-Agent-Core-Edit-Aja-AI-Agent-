@@ -79,8 +79,11 @@ def model_status(config: dict[str, Any] | None = None) -> str:
         lines.append(
             f"Fallback {index}: **{fallback_provider}** / `{fallback_model}`"
         )
-    if (config.get("edit_aja") or {}).get("gemini_enabled") is False:
+    edit_aja = config.get("edit_aja") or {}
+    if edit_aja.get("gemini_enabled") is False:
         lines.append("Gemini: **DISABLED**")
+    if edit_aja.get("cerebras_enabled") is False:
+        lines.append("Cerebras: **DISABLED**")
     return "\n".join(lines)
 
 
@@ -245,6 +248,7 @@ def compact_status(config: dict[str, Any] | None = None) -> str:
         f"API credentials: **{snap['total']}** ({snap['ready']} ready, {snap['cooldown']} cooldown, {snap['dead']} dead)",
         f"Quiet mode: **{quiet}**",
         f"Gemini: **{'DISABLED' if (config.get('edit_aja') or {}).get('gemini_enabled') is False else 'not configured by Edit Aja'}**",
+        f"Cerebras: **{'DISABLED' if (config.get('edit_aja') or {}).get('cerebras_enabled') is False else 'not configured by Edit Aja'}**",
         "Laptop: **ONLINE**",
     ])
 
