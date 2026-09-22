@@ -8,6 +8,7 @@ on:
       - edit-aja-free-cloud-hardening
       - edit-aja-local-command-router
       - edit-aja-cloudflare-free-primary
+      - edit-aja-groq-cloudflare-only
   pull_request:
 
 permissions:
@@ -93,8 +94,12 @@ jobs:
           if (-not $migration.Contains('gateway restart')) {
             throw "Migration helper must reload the gateway after changing provider routing."
           }
-          if ($migration.Contains('auth add gemini')) {
-            throw "Migration helper must never add Gemini credentials."
+          if ($migration.Contains('auth add gemini') -or $migration.Contains('auth add cerebras')) {
+            throw "Migration helper must never add Gemini or Cerebras credentials."
+          }
+
+          if ($freeCloud.Contains('api.cerebras.ai') -or $freeCloud.Contains('Cerebras-first')) {
+            throw "Recurring-free setup must not retain Cerebras routing."
           }
 
           if (-not $freeCloud.Contains('Applying Groq-first Edit Aja routing')) {
