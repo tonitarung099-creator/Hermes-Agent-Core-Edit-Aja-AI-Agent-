@@ -1,11 +1,10 @@
-# Edit Aja AI Agent - free-cloud configuration
-# Primary: Cerebras GPT-OSS 120B
-# Fallback: Cloudflare Workers AI (optional) -> Groq
-# Gemini is not used by this profile.
+# Edit Aja AI Agent - recurring-free cloud configuration
+# Primary: Cloudflare Workers AI / GLM-4.7-Flash
+# Fallback: Groq / GPT-OSS 120B
+# Gemini and Cerebras are not used by this profile.
 
 param(
     [string]$CloudflareAccountId = "",
-    [string]$MainModel = "gpt-oss-120b",
     [string]$CloudflareModel = "@cf/zai-org/glm-4.7-flash",
     [string]$GroqModel = "openai/gpt-oss-120b"
 )
@@ -32,23 +31,23 @@ function Ask-YesNo([string]$Prompt, [bool]$DefaultYes = $true) {
 
 Write-Host ""
 Write-Host "============================================================"
-Write-Host " Edit Aja AI Agent - Free Cloud Setup"
+Write-Host " Edit Aja AI Agent - Recurring Free Cloud Setup"
 Write-Host "============================================================"
 Write-Host ""
-Write-Host "Primary : Cerebras / $MainModel"
-Write-Host "Fallback: Cloudflare Workers AI -> Groq"
-Write-Host "Gemini  : DISABLED for Edit Aja routing"
+Write-Host "Recommended primary : Cloudflare Workers AI / $CloudflareModel"
+Write-Host "Fallback            : Groq / $GroqModel"
+Write-Host "Gemini              : DISABLED"
+Write-Host "Cerebras            : DISABLED (not a recurring-free default)"
 Write-Host ""
-Write-Host "API keys are stored by Hermes locally and are not written to GitHub."
+Write-Host "API credentials are stored by Hermes locally and are not written to GitHub."
 Write-Host ""
 
 if ([string]::IsNullOrWhiteSpace($CloudflareAccountId)) {
-    $CloudflareAccountId = (Read-Host "Cloudflare Account ID (leave empty to skip Cloudflare fallback)").Trim()
+    $CloudflareAccountId = (Read-Host "Cloudflare Account ID (leave empty to use Groq as primary)").Trim()
 }
 
 $argsList = @(
     "-m", "hermes_cli.edit_aja_mode",
-    "--main-model", $MainModel,
     "--cloudflare-model", $CloudflareModel,
     "--groq-model", $GroqModel
 )
@@ -57,17 +56,13 @@ if (-not [string]::IsNullOrWhiteSpace($CloudflareAccountId)) {
 }
 
 Write-Host ""
-Write-Host "Applying Cerebras-first Edit Aja routing..."
+Write-Host "Applying recurring-free Edit Aja routing..."
 & $python @argsList
 if ($LASTEXITCODE -ne 0) {
-    throw "Could not apply Edit Aja free-cloud configuration."
+    throw "Could not apply Edit Aja recurring-free configuration."
 }
 
-Write-Host ""
-if (Ask-YesNo "Add a Cerebras API key now?" $true) {
-    & $hermes auth add cerebras --type api-key --label "Cerebras 01"
-    if ($LASTEXITCODE -ne 0) { throw "Could not add the Cerebras API key." }
-}
+$providersToList = @()
 
 if (-not [string]::IsNullOrWhiteSpace($CloudflareAccountId)) {
     Write-Host ""
@@ -75,6 +70,10 @@ if (-not [string]::IsNullOrWhiteSpace($CloudflareAccountId)) {
         & $hermes auth add cloudflare --type api-key --label "Cloudflare 01"
         if ($LASTEXITCODE -ne 0) { throw "Could not add the Cloudflare API token." }
     }
+    $providersToList += "cloudflare"
+} else {
+    Write-Host ""
+    Write-Host "Cloudflare skipped. Groq will be the primary provider."
 }
 
 Write-Host ""
@@ -82,27 +81,25 @@ if (Ask-YesNo "Add a Groq API key now?" $true) {
     & $hermes auth add groq --type api-key --label "Groq 01"
     if ($LASTEXITCODE -ne 0) { throw "Could not add the Groq API key." }
 }
+$providersToList += "groq"
 
 Write-Host ""
-Write-Host "Configured credential pools:"
-$providersToList = @("cerebras")
-if (-not [string]::IsNullOrWhiteSpace($CloudflareAccountId)) {
-    $providersToList += "cloudflare"
-}
-$providersToList += "groq"
+Write-Host "Configured active credential pools:"
 foreach ($provider in $providersToList) {
     & $hermes auth list $provider
     if ($LASTEXITCODE -ne 0) {
-        Write-Warning "Could not read the $provider credential pool. The provider configuration was kept; you can retry with: hermes auth list $provider"
+        Write-Warning "Could not read the $provider credential pool. You can retry with: hermes auth list $provider"
     }
 }
 
 Write-Host ""
-Write-Host "Free-cloud setup complete."
-Write-Host "Primary : cerebras / $MainModel"
+Write-Host "Recurring-free setup complete."
 if (-not [string]::IsNullOrWhiteSpace($CloudflareAccountId)) {
-    Write-Host "Fallback: cloudflare / $CloudflareModel -> groq / $GroqModel"
-} else {
+    Write-Host "Primary : cloudflare / $CloudflareModel"
     Write-Host "Fallback: groq / $GroqModel"
+} else {
+    Write-Host "Primary : groq / $GroqModel"
+    Write-Host "Fallback: none"
 }
 Write-Host "Gemini  : disabled for Edit Aja routing"
+Write-Host "Cerebras: disabled for Edit Aja routing"
