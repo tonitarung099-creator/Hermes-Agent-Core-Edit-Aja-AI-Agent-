@@ -28,7 +28,7 @@ Open **PowerShell** and run:
 iex (irm https://raw.githubusercontent.com/tonitarung099-creator/Hermes-Agent-Core-Edit-Aja-AI-Agent-/main/scripts/install-edit-aja-windows.ps1)
 ```
 
-The setup is interactive. It installs the fork, configures **Cerebras-first recurring-free Edit Aja mode**, lets you add Cerebras and Groq credentials through Hermes' masked credential prompt (plus optional Cloudflare), asks for Telegram configuration, registers gateway auto-start, and starts the gateway.
+The setup is interactive. It installs the fork, configures **Groq + Cloudflare recurring-free Edit Aja mode**, lets you add Groq and Cloudflare credentials through Hermes' masked credential prompt, asks for Telegram configuration, registers gateway auto-start, and starts the gateway.
 
 ### Install on drive D (recommended when C is low on space)
 
@@ -44,26 +44,25 @@ After installation, `HERMES_HOME` is persisted for the Windows user so gateway/a
 
 ## AI provider preparation
 
-Edit Aja no longer uses Gemini in its active routing profile.
+Edit Aja uses only Groq and Cloudflare Workers AI in its active routing profile. Gemini and Cerebras are disabled.
 
 Default routing:
 
-- Primary: **Cerebras** — `gpt-oss-120b`
-- Optional extra free pool + vision: **Cloudflare Workers AI** — `@cf/zai-org/glm-4.7-flash` plus Gemma vision
-- Fallback: **Groq** — `openai/gpt-oss-120b`
+- Primary: **Groq** — `openai/gpt-oss-120b`
+- Fallback + vision: **Cloudflare Workers AI** — `@cf/zai-org/glm-4.7-flash` plus Gemma vision
 - Gemini: **disabled for Edit Aja routing**
+- Cerebras: **disabled for Edit Aja routing**
 - API retry count: **1** per provider call
 - Automatic post-exhaustion retry loops: **disabled**
 - Deterministic/local tools remain preferred before any LLM call
 
-Prepare a **Cerebras API key** first; it is the primary Edit Aja provider. Also prepare a **Groq API key** as an independent fallback. Cloudflare is optional: if you provide an Account ID + Workers AI token, Edit Aja keeps it as an additional free fallback and dedicated vision route.
+Prepare a **Groq API key** for the primary model. For Cloudflare fallback and screenshot/vision support, also prepare a **Cloudflare Account ID** and Workers AI API token. No Cerebras or Gemini key is needed for Edit Aja.
 
 Credentials are entered through Hermes' masked prompt and stored locally in Hermes' credential pool. They are never committed to GitHub.
 
 Inspect the pools with:
 
 ```powershell
-hermes auth list cerebras
 hermes auth list cloudflare
 hermes auth list groq
 ```
@@ -72,13 +71,13 @@ For Cloudflare Workers AI, the setup asks for your **Cloudflare Account ID** bec
 
 ### Existing installation: switch away from Gemini
 
-For an existing Windows install, use the migration helper. It updates the fork, applies the Cerebras-first recurring-free profile, restarts the gateway, and verifies status:
+For an existing Windows install, use the migration helper. It updates the fork, applies the Groq-primary + Cloudflare-fallback profile, restarts the gateway, and verifies status:
 
 ```powershell
 & ([scriptblock]::Create((irm "https://raw.githubusercontent.com/tonitarung099-creator/Hermes-Agent-Core-Edit-Aja-AI-Agent-/main/scripts/switch-edit-aja-free-cloud.ps1"))) -HermesHome "D:\EditAjaAI"
 ```
 
-The helper asks for Cerebras and Groq credentials through Hermes' masked prompts, with Cloudflare optional. Existing Gemini credentials may remain stored locally, but the Edit Aja profile will not route normal requests to Gemini.
+The helper asks for Groq and Cloudflare credentials through Hermes' masked prompts. Existing Gemini or Cerebras credentials may remain stored locally, but the Edit Aja profile will not route requests to them.
 
 ## Telegram preparation
 
@@ -112,8 +111,8 @@ Keep the project progression in this order:
 
 **Phase 1 — Foundation**
 - Windows installation
-- Cerebras-first recurring-free provider setup with Groq fallback and optional Cloudflare vision
-- Groq fallback pool
+- Groq GPT-OSS 120B primary provider
+- Cloudflare Workers AI fallback + vision
 - Telegram private access
 - gateway auto-start
 - local command execution
@@ -149,7 +148,7 @@ These commands are handled locally by the gateway and do not need an LLM reasoni
 ```text
 /status        Compact Edit Aja runtime status
 /model         Current primary + fallback model routes
-/api           Cerebras/Cloudflare/Groq pool health (READY / COOLDOWN / DEAD)
+/api           Groq/Cloudflare pool health (READY / COOLDOWN / DEAD)
 /quiet on      Final-answer-first Telegram mode
 /quiet off     Show technical progress again
 /debug on      Alias for technical/debug display
