@@ -1,5 +1,5 @@
-# Edit Aja AI Agent - migrate an existing Windows install away from Gemini.
-# Updates the fork, applies the Cerebras-first free-cloud profile, then reloads the gateway.
+# Edit Aja AI Agent - migrate an existing Windows install to recurring-free routing.
+# Updates the fork, applies Cloudflare-first + Groq fallback, then reloads the gateway.
 
 param(
     [string]$HermesHome = $(if ($env:HERMES_HOME) { $env:HERMES_HOME } else { "$env:LOCALAPPDATA\hermes" })
@@ -21,13 +21,14 @@ if (-not (Test-Path -LiteralPath $repoDir)) {
 
 Write-Host ""
 Write-Host "============================================================"
-Write-Host " Edit Aja - Switch to Cerebras Free Cloud"
+Write-Host " Edit Aja - Switch to Recurring Free Cloud"
 Write-Host "============================================================"
 Write-Host ""
 Write-Host "Install : $HermesHome"
-Write-Host "Primary : Cerebras / gpt-oss-120b"
-Write-Host "Fallback: Cloudflare Workers AI (optional) -> Groq"
-Write-Host "Gemini  : will not be used by the Edit Aja routing profile"
+Write-Host "Primary : Cloudflare Workers AI / @cf/zai-org/glm-4.7-flash"
+Write-Host "Fallback: Groq / openai/gpt-oss-120b"
+Write-Host "Gemini  : disabled"
+Write-Host "Cerebras: disabled from active Edit Aja routing"
 Write-Host ""
 
 Write-Host "[1/4] Updating Edit Aja from GitHub main..."
@@ -38,15 +39,15 @@ if ($LASTEXITCODE -ne 0) {
 
 $setup = Join-Path $repoDir "scripts\configure-edit-aja-free-cloud.ps1"
 if (-not (Test-Path -LiteralPath $setup)) {
-    throw "Free-cloud setup helper was not found after update: $setup"
+    throw "Recurring-free setup helper was not found after update: $setup"
 }
 
 Write-Host ""
-Write-Host "[2/4] Configuring Cerebras-first routing..."
+Write-Host "[2/4] Configuring Cloudflare-first recurring-free routing..."
 $setupText = Get-Content -LiteralPath $setup -Raw
 & ([scriptblock]::Create($setupText))
 if ($LASTEXITCODE -ne 0) {
-    throw "Free-cloud AI setup failed."
+    throw "Recurring-free AI setup failed."
 }
 
 Write-Host ""
