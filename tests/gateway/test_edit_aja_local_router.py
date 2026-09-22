@@ -23,15 +23,16 @@ def _config():
         "edit_aja": {
             "enabled": True,
             "quiet_mode": True,
-            "ai_profile": "cloudflare-recurring-free",
+            "ai_profile": "cerebras-free-cloud",
             "gemini_enabled": False,
-            "cerebras_enabled": False,
+            "cerebras_enabled": True,
         },
         "model": {
-            "provider": "cloudflare",
-            "default": "@cf/zai-org/glm-4.7-flash",
+            "provider": "cerebras",
+            "default": "gpt-oss-120b",
         },
         "fallback_providers": [
+            {"provider": "cloudflare", "model": "@cf/zai-org/glm-4.7-flash"},
             {"provider": "groq", "model": "openai/gpt-oss-120b"},
         ],
     }
@@ -41,8 +42,8 @@ def _snapshot():
     return {
         "providers": [],
         "rows": [],
-        "total": 2,
-        "ready": 1,
+        "total": 3,
+        "ready": 2,
         "cooldown": 1,
         "dead": 0,
     }
@@ -51,6 +52,7 @@ def _snapshot():
 def test_local_intent_is_conservative():
     assert local_intent("model yang kamu pakai apa?") == "model"
     assert local_intent("api saya ada berapa?") == "api"
+    assert local_intent("status api cerebras") == "api"
     assert local_intent("status api cloudflare") == "api"
     assert local_intent("gateway hidup?") == "status"
     assert local_intent("/model") is None
@@ -63,24 +65,36 @@ def test_model_and_compact_status_are_local_and_specific(monkeypatch):
     cfg = _config()
 
     model = model_status(cfg)
+    assert "cerebras" in model.lower()
+    assert "gpt-oss-120b" in model
     assert "cloudflare" in model.lower()
-    assert "@cf/zai-org/glm-4.7-flash" in model
     assert "groq" in model.lower()
     assert "Gemini: **DISABLED**" in model
-    assert "Cerebras: **DISABLED**" in model
+    assert "Cerebras: **ACTIVE**" in model
 
     status = compact_status(cfg)
     assert "Gateway: **ONLINE**" in status
-    assert "API credentials: **2**" in status
-    assert "Fallbacks: **groq**" in status
+    assert "API credentials: **3**" in status
+    assert "Fallbacks: **cloudflare → groq**" in status
     assert "Gemini: **DISABLED**" in status
-    assert "Cerebras: **DISABLED**" in status
+    assert "Cerebras: **ACTIVE**" in status
     assert "Quiet mode: **ON**" in status
 
 
 def test_api_status_reports_active_route_pools_without_secrets_or_fake_percent(monkeypatch):
     now = time.time()
     pools = {
+        "cerebras": [
+            SimpleNamespace(
+                label="Cerebras 01",
+                priority=0,
+                last_status="ok",
+                last_error_reset_at=None,
+                model_cooldowns={},
+                request_count=3,
+                access_token="secret-cerebras",
+            )
+        ],
         "cloudflare": [
             SimpleNamespace(
                 label="Cloudflare 01",
@@ -119,10 +133,11 @@ def test_api_status_reports_active_route_pools_without_secrets_or_fake_percent(m
 
     text = api_status(_config())
 
-    assert "Credentials: **2**" in text
+    assert "Credentials: **3**" in text
+    assert "Cerebras 01: **READY**" in text
     assert "Cloudflare 01: **COOLDOWN**" in text
     assert "Groq 01: **READY**" in text
-    assert "Cerebras" not in text
+    assert "secret-cerebras" not in text
     assert "secret-cloudflare" not in text
     assert "secret-groq" not in text
     assert "50%" not in text
@@ -155,8 +170,8 @@ def test_local_reply_requires_edit_aja_marker(monkeypatch):
     monkeypatch.setattr("gateway.edit_aja_local.api_snapshot", lambda _cfg=None: _snapshot())
 
     assert local_reply("model yang kamu pakai apa?", {}) is None
-    assert "@cf/zai-org/glm-4.7-flash" in local_reply("model yang kamu pakai apa?", _config())
-    assert "API credentials: **2**" in local_reply("agent hidup?", _config())
+    assert "gpt-oss-120b" in local_reply("model yang kamu pakai apa?", _config())
+    assert "API credentials: **3**" in local_reply("agent hidup?", _config())
 
 
 @pytest.mark.asyncio
@@ -169,5 +184,5 @@ async def test_edit_aja_status_handler_returns_before_session_or_llm(monkeypatch
     result = await runner._handle_status_command(SimpleNamespace())
 
     assert "EDIT AJA AI AGENT" in result
-    assert "@cf/zai-org/glm-4.7-flash" in result
-    assert "cloudflare" in result.lower()
+    assert "gpt-oss-120b" in result
+    assert "cerebras" in result.lower()
