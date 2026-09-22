@@ -52,7 +52,7 @@ Write-Host "Large caches     : $cacheRoot"
 Write-Host ""
 Write-Host "This setup will:"
 Write-Host "  1. Install the Edit Aja Hermes fork"
-Write-Host "  2. Configure Cloudflare Workers AI + Groq recurring-free routing"
+Write-Host "  2. Configure Cerebras GPT-OSS 120B + Groq recurring-free routing (Cloudflare optional)"
 Write-Host "  3. Configure the Telegram gateway"
 Write-Host "  4. Start Hermes automatically when you log in to Windows"
 Write-Host ""
@@ -74,7 +74,7 @@ if (-not (Test-Path -LiteralPath $hermes)) {
 }
 
 Write-Host ""
-Write-Host "[2/4] Cloudflare-first recurring-free AI setup..."
+Write-Host "[2/4] Cerebras-first recurring-free AI setup..."
 $aiSetup = Join-Path $installDir "scripts\configure-edit-aja-free-cloud.ps1"
 if (-not (Test-Path -LiteralPath $aiSetup)) {
     throw "Recurring-free setup helper was not found at $aiSetup"
