@@ -15,7 +15,7 @@ $replacement = Join-Path $hermesHome "hermes-agent\scripts\configure-edit-aja-fr
 
 Write-Host ""
 Write-Host "Gemini setup has been retired from Edit Aja."
-Write-Host "Switching to Cloudflare-first recurring-free setup instead."
+Write-Host "Switching to Groq + Cloudflare recurring-free setup instead."
 Write-Host ""
 
 if (-not (Test-Path -LiteralPath $replacement)) {

@@ -1,11 +1,10 @@
-"""Edit Aja Cerebras-first recurring-free cloud configuration tests."""
+"""Edit Aja Groq + Cloudflare recurring-free cloud configuration tests."""
 
 from __future__ import annotations
 
 from copy import deepcopy
 
 from hermes_cli.edit_aja_mode import (
-    CEREBRAS_BASE_URL,
     CLOUDFLARE_BASE_URL_TEMPLATE,
     DEFAULT_CLOUDFLARE_MODEL,
     DEFAULT_CLOUDFLARE_VISION_MODEL,
@@ -16,17 +15,29 @@ from hermes_cli.edit_aja_mode import (
 )
 
 
-def test_free_cloud_profile_uses_cerebras_and_never_routes_to_gemini():
+def test_free_cloud_profile_uses_only_groq_and_cloudflare():
     original = {
+        "providers": {
+            "cerebras": {
+                "name": "Cerebras",
+                "api": "https://api.cerebras.ai/v1",
+                "default_model": "gpt-oss-120b",
+            },
+            "gemini": {
+                "name": "Gemini",
+                "api": "https://generativelanguage.googleapis.com/v1beta",
+            },
+        },
         "model": {
-            "provider": "gemini",
-            "default": "gemini-old",
-            "base_url": "https://generativelanguage.googleapis.com/v1beta",
+            "provider": "cerebras",
+            "default": "gpt-oss-120b",
+            "base_url": "https://api.cerebras.ai/v1",
             "api_key": "must-not-survive",
             "api_mode": "chat_completions",
         },
         "fallback_providers": [
             {"provider": "gemini", "model": "gemini-fallback"},
+            {"provider": "cerebras", "model": "gpt-oss-120b"},
         ],
         "fallback_model": {"provider": "gemini", "model": "legacy-gemini"},
         "auxiliary": {
@@ -39,6 +50,7 @@ def test_free_cloud_profile_uses_cerebras_and_never_routes_to_gemini():
         },
         "credential_pool_strategies": {
             "gemini": "fill_first",
+            "cerebras": "fill_first",
             "anthropic": "least_used",
         },
     }
@@ -49,62 +61,67 @@ def test_free_cloud_profile_uses_cerebras_and_never_routes_to_gemini():
         cloudflare_account_id="abcdef1234567890",
     )
 
-    assert cfg["model"]["provider"] == "cerebras"
-    assert cfg["model"]["default"] == DEFAULT_MAIN_MODEL
+    assert cfg["model"] == {
+        "provider": "groq",
+        "default": DEFAULT_GROQ_MODEL,
+    }
     assert "api_key" not in cfg["model"]
     assert "base_url" not in cfg["model"]
     assert "api_mode" not in cfg["model"]
 
-    assert cfg["providers"]["cerebras"]["api"] == CEREBRAS_BASE_URL
-    assert cfg["providers"]["cerebras"]["default_model"] == DEFAULT_MAIN_MODEL
+    assert "cerebras" not in cfg["providers"]
+    assert "gemini" not in cfg["providers"]
+    assert cfg["providers"]["groq"]["api"] == GROQ_BASE_URL
+    assert cfg["providers"]["groq"]["default_model"] == DEFAULT_GROQ_MODEL
     assert cfg["providers"]["cloudflare"]["api"] == (
         CLOUDFLARE_BASE_URL_TEMPLATE.format(account_id="abcdef1234567890")
     )
     assert cfg["providers"]["cloudflare"]["default_model"] == DEFAULT_CLOUDFLARE_MODEL
     assert DEFAULT_CLOUDFLARE_VISION_MODEL in cfg["providers"]["cloudflare"]["models"]
     assert cfg["providers"]["cloudflare"]["models"][DEFAULT_CLOUDFLARE_VISION_MODEL]["context_length"] == 256_000
-    assert cfg["providers"]["groq"]["api"] == GROQ_BASE_URL
-    assert cfg["providers"]["groq"]["default_model"] == DEFAULT_GROQ_MODEL
 
     assert cfg["fallback_providers"] == [
         {"provider": "cloudflare", "model": DEFAULT_CLOUDFLARE_MODEL},
-        {"provider": "groq", "model": DEFAULT_GROQ_MODEL},
     ]
     assert "fallback_model" not in cfg
-    assert all(row["provider"] != "gemini" for row in cfg["fallback_providers"])
 
     assert cfg["auxiliary"]["vision"]["provider"] == "cloudflare"
     assert cfg["auxiliary"]["vision"]["model"] == DEFAULT_CLOUDFLARE_VISION_MODEL
     assert "api_key" not in cfg["auxiliary"]["vision"]
     assert "fallback_chain" not in cfg["auxiliary"]["vision"]
+    assert cfg["auxiliary"]["compression"]["provider"] == "main"
+    assert cfg["auxiliary"]["compression"]["model"] == DEFAULT_GROQ_MODEL
 
     assert cfg["agent"]["api_max_retries"] == 1
     assert cfg["agent"]["auto_recovery_cycles"] == 0
     assert cfg["fallback"]["min_switch_reset_seconds"] == 60
 
     assert "gemini" not in cfg["credential_pool_strategies"]
-    assert cfg["credential_pool_strategies"]["cerebras"] == "fill_first"
+    assert "cerebras" not in cfg["credential_pool_strategies"]
     assert cfg["credential_pool_strategies"]["cloudflare"] == "fill_first"
     assert cfg["credential_pool_strategies"]["groq"] == "fill_first"
 
-    assert cfg["edit_aja"]["ai_profile"] == "cerebras-free-cloud"
-    assert cfg["edit_aja"]["primary_provider"] == "cerebras"
+    assert cfg["edit_aja"]["ai_profile"] == "groq-cloudflare-free"
+    assert cfg["edit_aja"]["primary_provider"] == "groq"
     assert cfg["edit_aja"]["gemini_enabled"] is False
-    assert cfg["edit_aja"]["cerebras_enabled"] is True
+    assert cfg["edit_aja"]["cerebras_enabled"] is False
 
-    # Input is not mutated and secrets are not copied into the generated route.
     assert original == before
 
 
-def test_cloudflare_is_optional_but_groq_stays_available():
+def test_without_cloudflare_groq_is_primary_and_only_route():
     cfg = build_edit_aja_free_cloud_config({})
 
     assert "cloudflare" not in cfg["providers"]
+    assert "cerebras" not in cfg["providers"]
+    assert "gemini" not in cfg["providers"]
+    assert cfg["model"] == {
+        "provider": "groq",
+        "default": DEFAULT_GROQ_MODEL,
+    }
     assert cfg["auxiliary"]["vision"]["provider"] == "main"
-    assert cfg["auxiliary"]["vision"]["model"] == DEFAULT_MAIN_MODEL
-    assert cfg["fallback_providers"] == [
-        {"provider": "groq", "model": DEFAULT_GROQ_MODEL},
-    ]
+    assert cfg["auxiliary"]["vision"]["model"] == DEFAULT_GROQ_MODEL
+    assert cfg["fallback_providers"] == []
 
 
 def test_existing_cloudflare_account_id_survives_reapply():
@@ -120,38 +137,43 @@ def test_existing_cloudflare_account_id_survives_reapply():
     cfg = build_edit_aja_free_cloud_config(existing)
 
     assert "existing123" in cfg["providers"]["cloudflare"]["api"]
-    assert cfg["fallback_providers"][0]["provider"] == "cloudflare"
-
-
-def test_custom_model_overrides_remain_non_gemini():
-    cfg = build_edit_aja_free_cloud_config(
-        {},
-        main_model="gpt-oss-test",
-        cloudflare_account_id="cfaccount123",
-        cloudflare_model="@cf/test/model",
-        groq_model="openai/gpt-oss-test",
-    )
-
-    assert cfg["model"]["provider"] == "cerebras"
-    assert cfg["model"]["default"] == "gpt-oss-test"
-    assert cfg["auxiliary"]["compression"]["model"] == "gpt-oss-test"
+    assert cfg["model"]["provider"] == "groq"
     assert cfg["fallback_providers"] == [
-        {"provider": "cloudflare", "model": "@cf/test/model"},
-        {"provider": "groq", "model": "openai/gpt-oss-test"},
+        {"provider": "cloudflare", "model": DEFAULT_CLOUDFLARE_MODEL},
     ]
 
 
-def test_invalid_cloudflare_account_id_is_not_written_into_url():
+def test_custom_groq_and_cloudflare_models_are_preserved():
+    cfg = build_edit_aja_free_cloud_config(
+        {},
+        main_model="openai/gpt-oss-test",
+        cloudflare_account_id="cfaccount123",
+        cloudflare_model="@cf/test/model",
+    )
+
+    assert cfg["model"] == {
+        "provider": "groq",
+        "default": "openai/gpt-oss-test",
+    }
+    assert cfg["providers"]["groq"]["default_model"] == "openai/gpt-oss-test"
+    assert cfg["auxiliary"]["compression"]["model"] == "openai/gpt-oss-test"
+    assert cfg["fallback_providers"] == [
+        {"provider": "cloudflare", "model": "@cf/test/model"},
+    ]
+
+
+def test_invalid_cloudflare_account_id_leaves_groq_only():
     cfg = build_edit_aja_free_cloud_config(
         {},
         cloudflare_account_id="https://evil.example/account",
     )
 
     assert "cloudflare" not in cfg["providers"]
-    assert all(row["provider"] != "cloudflare" for row in cfg["fallback_providers"])
+    assert cfg["model"]["provider"] == "groq"
+    assert cfg["fallback_providers"] == []
 
 
-def test_explicit_cloudflare_disable_keeps_cerebras_primary_and_groq_fallback():
+def test_explicit_cloudflare_disable_removes_old_route_and_keeps_groq():
     existing = {
         "providers": {
             "cloudflare": {
@@ -165,10 +187,8 @@ def test_explicit_cloudflare_disable_keeps_cerebras_primary_and_groq_fallback():
 
     assert "cloudflare" not in cfg["providers"]
     assert cfg["model"] == {
-        "provider": "cerebras",
+        "provider": "groq",
         "default": DEFAULT_MAIN_MODEL,
     }
-    assert cfg["fallback_providers"] == [
-        {"provider": "groq", "model": DEFAULT_GROQ_MODEL},
-    ]
-    assert cfg["edit_aja"]["cerebras_enabled"] is True
+    assert cfg["fallback_providers"] == []
+    assert cfg["edit_aja"]["cerebras_enabled"] is False

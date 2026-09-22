@@ -1,8 +1,8 @@
 """Runtime/auth integration checks for Edit Aja's recurring-free providers.
 
-These tests verify that Hermes treats Cerebras, optional Cloudflare, and Groq
-as configured auth targets and can bind pooled credentials to their
-OpenAI-compatible routes. No network access is used.
+These tests verify that Hermes treats Groq and optional Cloudflare as configured
+auth targets and can bind pooled credentials to their OpenAI-compatible routes.
+No network access is used.
 """
 
 from __future__ import annotations
@@ -12,11 +12,9 @@ from types import SimpleNamespace
 import pytest
 
 from hermes_cli.edit_aja_mode import (
-    CEREBRAS_BASE_URL,
     CLOUDFLARE_BASE_URL_TEMPLATE,
     DEFAULT_CLOUDFLARE_MODEL,
     DEFAULT_GROQ_MODEL,
-    DEFAULT_MAIN_MODEL,
     GROQ_BASE_URL,
     build_edit_aja_free_cloud_config,
 )
@@ -32,16 +30,14 @@ def _free_cloud_config():
 @pytest.mark.parametrize(
     ("provider", "expected_url"),
     [
-        ("cerebras", CEREBRAS_BASE_URL),
+        ("groq", GROQ_BASE_URL),
         (
             "cloudflare",
             CLOUDFLARE_BASE_URL_TEMPLATE.format(account_id="abcdef1234567890"),
         ),
-        ("groq", GROQ_BASE_URL),
     ],
 )
 def test_auth_cli_recognizes_edit_aja_named_providers(monkeypatch, provider, expected_url):
-    """hermes auth add/list <provider> must recognize active Edit Aja provider IDs."""
     from hermes_cli import auth_commands
     from hermes_cli import config as config_mod
 
@@ -62,19 +58,17 @@ def test_auth_cli_recognizes_edit_aja_named_providers(monkeypatch, provider, exp
 @pytest.mark.parametrize(
     ("provider", "model", "expected_url"),
     [
-        ("cerebras", DEFAULT_MAIN_MODEL, CEREBRAS_BASE_URL),
+        ("groq", DEFAULT_GROQ_MODEL, GROQ_BASE_URL),
         (
             "cloudflare",
             DEFAULT_CLOUDFLARE_MODEL,
             CLOUDFLARE_BASE_URL_TEMPLATE.format(account_id="abcdef1234567890"),
         ),
-        ("groq", DEFAULT_GROQ_MODEL, GROQ_BASE_URL),
     ],
 )
 def test_runtime_resolves_edit_aja_provider_from_credential_pool(
     monkeypatch, provider, model, expected_url
 ):
-    """Configured provider + pooled key must resolve without falling into another provider."""
     from hermes_cli import runtime_provider
 
     cfg = _free_cloud_config()
@@ -118,18 +112,17 @@ def test_runtime_resolves_edit_aja_provider_from_credential_pool(
     assert runtime["source"] == f"pool:{provider}"
 
 
-def test_recurring_free_primary_and_fallback_order_uses_cerebras_and_excludes_gemini():
+def test_recurring_free_primary_and_fallback_order_uses_only_groq_and_cloudflare():
     cfg = _free_cloud_config()
 
     assert cfg["model"] == {
-        "provider": "cerebras",
-        "default": DEFAULT_MAIN_MODEL,
+        "provider": "groq",
+        "default": DEFAULT_GROQ_MODEL,
     }
     assert cfg["fallback_providers"] == [
         {"provider": "cloudflare", "model": DEFAULT_CLOUDFLARE_MODEL},
-        {"provider": "groq", "model": DEFAULT_GROQ_MODEL},
     ]
-    assert cfg["providers"]["cerebras"]["api"] == CEREBRAS_BASE_URL
+    assert "cerebras" not in cfg["providers"]
+    assert "gemini" not in cfg["providers"]
     assert cfg["edit_aja"]["gemini_enabled"] is False
-    assert cfg["edit_aja"]["cerebras_enabled"] is True
-    assert all(row["provider"] != "gemini" for row in cfg["fallback_providers"])
+    assert cfg["edit_aja"]["cerebras_enabled"] is False
