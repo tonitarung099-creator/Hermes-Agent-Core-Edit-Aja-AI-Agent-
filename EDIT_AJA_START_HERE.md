@@ -28,7 +28,7 @@ Open **PowerShell** and run:
 iex (irm https://raw.githubusercontent.com/tonitarung099-creator/Hermes-Agent-Core-Edit-Aja-AI-Agent-/main/scripts/install-edit-aja-windows.ps1)
 ```
 
-The setup is interactive. It installs the fork, configures **Cloudflare-first recurring-free Edit Aja mode**, lets you add Cloudflare and Groq credentials through Hermes' masked credential prompt, asks for Telegram configuration, registers gateway auto-start, and starts the gateway.
+The setup is interactive. It installs the fork, configures **Cerebras-first recurring-free Edit Aja mode**, lets you add Cloudflare and Groq credentials through Hermes' masked credential prompt, asks for Telegram configuration, registers gateway auto-start, and starts the gateway.
 
 ### Install on drive D (recommended when C is low on space)
 
@@ -50,14 +50,15 @@ Default routing:
 
 - Primary: **Cloudflare Workers AI** — `@cf/zai-org/glm-4.7-flash`
 - Vision/screenshots: **Cloudflare Gemma 4 26B** — `@cf/google/gemma-4-26b-a4b-it`
+- Primary: **Cerebras** — `gpt-oss-120b`
+- Optional extra free pool + vision: **Cloudflare Workers AI** — `@cf/zai-org/glm-4.7-flash` plus Gemma vision
 - Fallback: **Groq** — `openai/gpt-oss-120b`
 - Gemini: **disabled for Edit Aja routing**
-- Cerebras: **disabled from the default Edit Aja routing** because its public API offer is a trial/credit-based plan rather than a recurring free allocation
 - API retry count: **1** per provider call
 - Automatic post-exhaustion retry loops: **disabled**
 - Deterministic/local tools remain preferred before any LLM call
 
-Prepare a Cloudflare **Account ID** and a fresh Workers AI API token before setup. Also prepare a Groq API key so Edit Aja has a separate fallback provider. If Cloudflare is skipped, the setup uses Groq as the primary instead.
+Prepare a **Cerebras API key** first; it is the primary Edit Aja provider. Also prepare a **Groq API key** as an independent fallback. Cloudflare is optional: if you provide an Account ID + Workers AI token, Edit Aja keeps it as an additional free fallback and dedicated vision route.
 
 Credentials are entered through Hermes' masked prompt and stored locally in Hermes' credential pool. They are never committed to GitHub.
 
@@ -78,7 +79,7 @@ For an existing Windows install, use the migration helper. It updates the fork, 
 & ([scriptblock]::Create((irm "https://raw.githubusercontent.com/tonitarung099-creator/Hermes-Agent-Core-Edit-Aja-AI-Agent-/main/scripts/switch-edit-aja-free-cloud.ps1"))) -HermesHome "D:\EditAjaAI"
 ```
 
-The helper asks for Cloudflare and Groq credentials through Hermes' masked prompts. Existing Gemini or Cerebras credentials may remain stored locally, but the Edit Aja profile will not route requests to them.
+The helper asks for Cerebras and Groq credentials through Hermes' masked prompts, with Cloudflare optional. Existing Gemini credentials may remain stored locally, but the Edit Aja profile will not route normal requests to Gemini.
 
 ## Telegram preparation
 
@@ -112,7 +113,7 @@ Keep the project progression in this order:
 
 **Phase 1 — Foundation**
 - Windows installation
-- Cloudflare-first recurring-free provider setup
+- Cerebras-first recurring-free provider setup with Groq fallback and optional Cloudflare vision
 - Groq fallback pool
 - Telegram private access
 - gateway auto-start
