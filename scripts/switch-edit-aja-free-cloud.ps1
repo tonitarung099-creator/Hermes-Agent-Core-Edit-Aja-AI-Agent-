@@ -1,5 +1,5 @@
 # Edit Aja AI Agent - migrate an existing Windows install to recurring-free routing.
-# Updates the fork, applies Cerebras-first + optional Cloudflare + Groq fallback, then reloads the gateway.
+# Updates the fork, applies Groq primary + optional Cloudflare fallback/vision, then reloads the gateway.
 
 param(
     [string]$HermesHome = $(if ($env:HERMES_HOME) { $env:HERMES_HOME } else { "$env:LOCALAPPDATA\hermes" })
@@ -21,14 +21,14 @@ if (-not (Test-Path -LiteralPath $repoDir)) {
 
 Write-Host ""
 Write-Host "============================================================"
-Write-Host " Edit Aja - Switch to Cerebras Free Cloud"
+Write-Host " Edit Aja - Switch to Groq + Cloudflare Free"
 Write-Host "============================================================"
 Write-Host ""
 Write-Host "Install : $HermesHome"
-Write-Host "Primary : Cerebras / gpt-oss-120b"
-Write-Host "Fallback: Cloudflare optional -> Groq / openai/gpt-oss-120b"
+Write-Host "Primary : Groq / openai/gpt-oss-120b"
+Write-Host "Fallback: Cloudflare Workers AI (optional)"
 Write-Host "Gemini  : disabled"
-Write-Host "Cerebras: enabled as primary"
+Write-Host "Cerebras: disabled"
 Write-Host ""
 
 Write-Host "[1/4] Updating Edit Aja from GitHub main..."
@@ -43,7 +43,7 @@ if (-not (Test-Path -LiteralPath $setup)) {
 }
 
 Write-Host ""
-Write-Host "[2/4] Configuring Cerebras-first recurring-free routing..."
+Write-Host "[2/4] Configuring Groq-first recurring-free routing..."
 $setupText = Get-Content -LiteralPath $setup -Raw
 & ([scriptblock]::Create($setupText))
 if ($LASTEXITCODE -ne 0) {
