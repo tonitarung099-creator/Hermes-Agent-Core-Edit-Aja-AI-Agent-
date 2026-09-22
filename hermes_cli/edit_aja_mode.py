@@ -1,16 +1,16 @@
 """Edit Aja recurring-free cloud runtime profile.
 
-Recommended routing:
-    Cloudflare Workers AI / GLM-4.7-Flash (primary)
-    Groq / openai/gpt-oss-120b (fallback)
+Primary AI:
+    Cerebras / gpt-oss-120b
 
-Cloudflare currently provides a recurring daily free allocation, while Groq
-provides a separate free rate-limit pool. Cerebras is intentionally not part of
-the default free routing profile because its public API is a time/credit-bounded
-trial rather than a permanently renewing no-cost tier.
+Fallbacks:
+    Cloudflare Workers AI / GLM-4.7-Flash (optional extra free pool + vision)
+    Groq / openai/gpt-oss-120b
 
-Both active routes use OpenAI-compatible Chat Completions endpoints. Secrets are
-kept in Hermes' credential pool; this module writes endpoint metadata only.
+Cerebras GPT-OSS 120B is the default reasoning/tool-calling brain. Cloudflare
+is optional and, when configured, also supplies the dedicated free-plan vision
+route. Groq is the final independent fallback. All routes use OpenAI-compatible
+Chat Completions endpoints. Secrets stay in Hermes' credential pool.
 
 Gemini is intentionally NOT part of the Edit Aja routing chain.
 """
@@ -24,17 +24,18 @@ from typing import Any
 
 from hermes_cli.config import clear_model_endpoint_credentials, load_config, save_config
 
+CEREBRAS_BASE_URL = "https://api.cerebras.ai/v1"
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 CLOUDFLARE_BASE_URL_TEMPLATE = (
     "https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1"
 )
 
+DEFAULT_CEREBRAS_MODEL = "gpt-oss-120b"
+DEFAULT_MAIN_MODEL = DEFAULT_CEREBRAS_MODEL
 DEFAULT_CLOUDFLARE_MODEL = "@cf/zai-org/glm-4.7-flash"
-DEFAULT_MAIN_MODEL = DEFAULT_CLOUDFLARE_MODEL
 DEFAULT_CLOUDFLARE_VISION_MODEL = "@cf/google/gemma-4-26b-a4b-it"
 DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b"
-DEFAULT_CLOUDFLARE_CONTEXT_LENGTH = 131_072
-DEFAULT_GROQ_CONTEXT_LENGTH = 131_072
+DEFAULT_CONTEXT_LENGTH = 131_072
 
 _AUX_TASKS = frozenset({
     "vision",
@@ -68,7 +69,7 @@ def _provider_entry(
     name: str,
     api: str,
     model: str,
-    context_length: int,
+    context_length: int = DEFAULT_CONTEXT_LENGTH,
 ) -> dict[str, Any]:
     return {
         "name": name,
@@ -104,19 +105,16 @@ def build_edit_aja_free_cloud_config(
     groq_model: str = DEFAULT_GROQ_MODEL,
     disable_cloudflare: bool = False,
 ) -> dict[str, Any]:
-    """Return Edit Aja's recurring-free, non-Gemini configuration.
-
-    With a Cloudflare account id, Workers AI is the primary route and Groq is
-    the fallback. Without Cloudflare, Groq becomes the primary so the profile
-    remains usable instead of silently falling back to a paid/trial provider.
+    """Return Edit Aja's Cerebras-first, non-Gemini configuration.
 
     API keys are never written into config.yaml. Named custom providers are
     registered first, then Hermes auth stores their secrets locally.
     """
 
     cfg: dict[str, Any] = deepcopy(config) if isinstance(config, dict) else {}
+    main_model = str(main_model or DEFAULT_MAIN_MODEL).strip() or DEFAULT_MAIN_MODEL
     cloudflare_model = (
-        str(cloudflare_model or main_model or DEFAULT_CLOUDFLARE_MODEL).strip()
+        str(cloudflare_model or DEFAULT_CLOUDFLARE_MODEL).strip()
         or DEFAULT_CLOUDFLARE_MODEL
     )
     groq_model = str(groq_model or DEFAULT_GROQ_MODEL).strip() or DEFAULT_GROQ_MODEL
@@ -126,21 +124,24 @@ def build_edit_aja_free_cloud_config(
         cf_account = _existing_cloudflare_account_id(cfg)
 
     providers = _dict_section(cfg, "providers")
-    # Remove the old Edit Aja-managed Cerebras route. Stored Cerebras credentials
-    # are left untouched locally, but this recurring-free profile never selects them.
-    providers.pop("cerebras", None)
+    providers["cerebras"] = _provider_entry(
+        name="Cerebras",
+        api=CEREBRAS_BASE_URL,
+        model=main_model,
+        context_length=DEFAULT_CONTEXT_LENGTH,
+    )
     providers["groq"] = _provider_entry(
         name="Groq",
         api=GROQ_BASE_URL,
         model=groq_model,
-        context_length=DEFAULT_GROQ_CONTEXT_LENGTH,
+        context_length=DEFAULT_CONTEXT_LENGTH,
     )
     if cf_account:
         providers["cloudflare"] = _provider_entry(
             name="Cloudflare Workers AI",
             api=CLOUDFLARE_BASE_URL_TEMPLATE.format(account_id=cf_account),
             model=cloudflare_model,
-            context_length=DEFAULT_CLOUDFLARE_CONTEXT_LENGTH,
+            context_length=DEFAULT_CONTEXT_LENGTH,
         )
         # Separate free-plan vision route for screenshots/UI understanding.
         providers["cloudflare"]["models"][DEFAULT_CLOUDFLARE_VISION_MODEL] = {
@@ -151,8 +152,8 @@ def build_edit_aja_free_cloud_config(
     cfg["providers"] = providers
 
     model = _dict_section(cfg, "model")
-    model["provider"] = "cloudflare" if cf_account else "groq"
-    model["default"] = cloudflare_model if cf_account else groq_model
+    model["provider"] = "cerebras"
+    model["default"] = main_model
     for key in ("base_url", "api_key", "key_env", "api_key_env"):
         model.pop(key, None)
     clear_model_endpoint_credentials(model, clear_api_mode=True)
@@ -161,9 +162,13 @@ def build_edit_aja_free_cloud_config(
     fallback_chain: list[dict[str, str]] = []
     if cf_account:
         fallback_chain.append({
-            "provider": "groq",
-            "model": groq_model,
+            "provider": "cloudflare",
+            "model": cloudflare_model,
         })
+    fallback_chain.append({
+        "provider": "groq",
+        "model": groq_model,
+    })
     cfg["fallback_providers"] = fallback_chain
     cfg.pop("fallback_model", None)
 
@@ -172,13 +177,13 @@ def build_edit_aja_free_cloud_config(
         block = auxiliary.get(task)
         block = dict(block) if isinstance(block, dict) else {}
         block["provider"] = "main"
-        block["model"] = model["default"]
+        block["model"] = main_model
         for key in ("base_url", "api_key", "key_env", "fallback_chain"):
             block.pop(key, None)
         auxiliary[task] = block
 
-    # Cloudflare GLM is the reasoning/tool brain. Cloudflare Gemma handles
-    # screenshots/UI understanding on the same recurring-free allocation.
+    # Cerebras GPT-OSS is the reasoning/tool brain, while Cloudflare Gemma is
+    # used only for image/screenshot understanding when Cloudflare is present.
     if cf_account:
         vision = dict(auxiliary.get("vision") or {})
         vision["provider"] = "cloudflare"
@@ -200,7 +205,7 @@ def build_edit_aja_free_cloud_config(
 
     strategies = _dict_section(cfg, "credential_pool_strategies")
     strategies.pop("gemini", None)
-    strategies.pop("cerebras", None)
+    strategies["cerebras"] = "fill_first"
     strategies["cloudflare"] = "fill_first"
     strategies["groq"] = "fill_first"
     cfg["credential_pool_strategies"] = strategies
@@ -208,10 +213,10 @@ def build_edit_aja_free_cloud_config(
     edit_aja = _dict_section(cfg, "edit_aja")
     edit_aja.update({
         "enabled": True,
-        "ai_profile": "cloudflare-recurring-free",
-        "primary_provider": model["provider"],
+        "ai_profile": "cerebras-free-cloud",
+        "primary_provider": "cerebras",
         "gemini_enabled": False,
-        "cerebras_enabled": False,
+        "cerebras_enabled": True,
     })
     cfg["edit_aja"] = edit_aja
 
@@ -243,8 +248,8 @@ def apply_edit_aja_free_cloud_defaults(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Configure Edit Aja with recurring-free Cloudflare primary, Groq fallback, "
-            "and no Gemini/Cerebras routing."
+            "Configure Edit Aja with Cerebras primary, Cloudflare/Groq fallback, "
+            "and no Gemini routing."
         )
     )
     parser.add_argument("--main-model", default=DEFAULT_MAIN_MODEL)
@@ -252,7 +257,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--no-cloudflare",
         action="store_true",
-        help="Explicitly remove/skip the Cloudflare route even if an old account id exists in config.",
+        help="Remove/skip the optional Cloudflare fallback/vision route even if an old account id exists.",
     )
     parser.add_argument("--cloudflare-model", default=DEFAULT_CLOUDFLARE_MODEL)
     parser.add_argument("--groq-model", default=DEFAULT_GROQ_MODEL)
@@ -265,16 +270,17 @@ def main(argv: list[str] | None = None) -> int:
         groq_model=args.groq_model,
         disable_cloudflare=args.no_cloudflare,
     )
+    fallbacks = cfg.get("fallback_providers") or []
 
     print("Edit Aja recurring-free mode configured.")
-    print(f"  Primary:     {cfg['model']['provider']} / {cfg['model']['default']}")
-    if cfg["model"]["provider"] == "cloudflare":
-        print(f"  Fallback #1: groq / {args.groq_model}")
+    print(f"  Primary:     cerebras / {cfg['model']['default']}")
+    if any(row.get("provider") == "cloudflare" for row in fallbacks if isinstance(row, dict)):
+        print(f"  Fallback #1: cloudflare / {args.cloudflare_model}")
+        print(f"  Fallback #2: groq / {args.groq_model}")
     else:
         print("  Cloudflare:  skipped (no account id configured)")
-        print("  Fallback:    none")
+        print(f"  Fallback #1: groq / {args.groq_model}")
     print("  Gemini:      disabled for Edit Aja routing")
-    print("  Cerebras:    disabled by default (trial/paid, not recurring-free)")
     print("  API retries: 1 per provider call")
     return 0
 
