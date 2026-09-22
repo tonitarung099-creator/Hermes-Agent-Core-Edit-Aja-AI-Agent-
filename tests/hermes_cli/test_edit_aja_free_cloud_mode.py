@@ -140,6 +140,30 @@ def test_existing_cloudflare_account_id_survives_reapply():
     ]
 
 
+def test_explicit_cloudflare_disable_removes_old_route_and_uses_groq():
+    existing = {
+        "providers": {
+            "cloudflare": {
+                "name": "Cloudflare Workers AI",
+                "api": CLOUDFLARE_BASE_URL_TEMPLATE.format(account_id="existing123"),
+            }
+        },
+        "model": {
+            "provider": "cloudflare",
+            "default": DEFAULT_CLOUDFLARE_MODEL,
+        },
+    }
+
+    cfg = build_edit_aja_free_cloud_config(existing, disable_cloudflare=True)
+
+    assert "cloudflare" not in cfg["providers"]
+    assert cfg["model"] == {
+        "provider": "groq",
+        "default": DEFAULT_GROQ_MODEL,
+    }
+    assert cfg["fallback_providers"] == []
+
+
 def test_custom_cloudflare_and_groq_model_overrides_remain_non_gemini_non_cerebras():
     cfg = build_edit_aja_free_cloud_config(
         {},
