@@ -1,4 +1,4 @@
-name: Edit Aja Free Cloud CI
+name: Edit Aja Recurring Free CI
 
 on:
   push:
@@ -7,6 +7,7 @@ on:
       - edit-aja-cerebras-free-cloud
       - edit-aja-free-cloud-hardening
       - edit-aja-local-command-router
+      - edit-aja-cloudflare-free-primary
   pull_request:
 
 permissions:
@@ -69,11 +70,20 @@ jobs:
           }
 
           $freeCloud = Get-Content scripts/configure-edit-aja-free-cloud.ps1 -Raw
-          if (-not $freeCloud.Contains('$providersToList = @("cerebras")')) {
-            throw "Free-cloud setup must build its credential-pool status list from configured providers."
+          if ($freeCloud.Contains('auth add gemini')) {
+            throw "Recurring-free setup must never add Gemini credentials."
           }
-          if (-not $freeCloud.Contains('$providersToList += "cloudflare"')) {
-            throw "Free-cloud setup must include Cloudflare status only when Cloudflare is configured."
+          if ($freeCloud.Contains('auth add cerebras')) {
+            throw "Recurring-free setup must never add Cerebras credentials."
+          }
+          if (-not $freeCloud.Contains('auth add cloudflare')) {
+            throw "Recurring-free setup must support Cloudflare credentials."
+          }
+          if (-not $freeCloud.Contains('auth add groq')) {
+            throw "Recurring-free setup must support Groq credentials."
+          }
+          if (-not $freeCloud.Contains('$providersToList = @()')) {
+            throw "Recurring-free setup must build the active credential-pool list dynamically."
           }
 
           $migration = Get-Content scripts/switch-edit-aja-free-cloud.ps1 -Raw
@@ -83,8 +93,8 @@ jobs:
           if (-not $migration.Contains('gateway restart')) {
             throw "Migration helper must reload the gateway after changing provider routing."
           }
-          if ($migration.Contains('auth add gemini')) {
-            throw "Migration helper must never add Gemini credentials."
+          if ($migration.Contains('auth add gemini') -or $migration.Contains('auth add cerebras')) {
+            throw "Migration helper must never add Gemini or Cerebras credentials."
           }
 
-          Write-Host "PowerShell syntax and non-Gemini bootstrap checks OK"
+          Write-Host "PowerShell syntax and recurring-free routing checks OK"
