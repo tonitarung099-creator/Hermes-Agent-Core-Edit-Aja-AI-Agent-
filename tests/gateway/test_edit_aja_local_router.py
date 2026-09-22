@@ -67,13 +67,14 @@ def test_model_and_compact_status_are_local_and_specific(monkeypatch):
     assert "@cf/zai-org/glm-4.7-flash" in model
     assert "groq" in model.lower()
     assert "Gemini: **DISABLED**" in model
-    assert "cerebras" not in model.lower()
+    assert "Cerebras: **DISABLED**" in model
 
     status = compact_status(cfg)
     assert "Gateway: **ONLINE**" in status
     assert "API credentials: **2**" in status
     assert "Fallbacks: **groq**" in status
     assert "Gemini: **DISABLED**" in status
+    assert "Cerebras: **DISABLED**" in status
     assert "Quiet mode: **ON**" in status
 
 
