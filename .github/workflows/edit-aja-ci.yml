@@ -73,8 +73,8 @@ jobs:
           if ($freeCloud.Contains('auth add gemini')) {
             throw "Recurring-free setup must never add Gemini credentials."
           }
-          if ($freeCloud.Contains('auth add cerebras')) {
-            throw "Recurring-free setup must never add Cerebras credentials."
+          if (-not $freeCloud.Contains('auth add cerebras')) {
+            throw "Recurring-free setup must support Cerebras credentials."
           }
           if (-not $freeCloud.Contains('auth add cloudflare')) {
             throw "Recurring-free setup must support Cloudflare credentials."
@@ -93,8 +93,12 @@ jobs:
           if (-not $migration.Contains('gateway restart')) {
             throw "Migration helper must reload the gateway after changing provider routing."
           }
-          if ($migration.Contains('auth add gemini') -or $migration.Contains('auth add cerebras')) {
-            throw "Migration helper must never add Gemini or Cerebras credentials."
+          if ($migration.Contains('auth add gemini')) {
+            throw "Migration helper must never add Gemini credentials."
           }
 
-          Write-Host "PowerShell syntax and recurring-free routing checks OK"
+          if (-not $freeCloud.Contains('Applying Cerebras-first Edit Aja routing')) {
+            throw "Recurring-free setup must apply Cerebras-first routing."
+          }
+
+          Write-Host "PowerShell syntax and Cerebras-first recurring-free routing checks OK"
