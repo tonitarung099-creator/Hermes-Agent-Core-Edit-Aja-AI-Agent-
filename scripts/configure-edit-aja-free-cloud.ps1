@@ -53,6 +53,9 @@ $argsList = @(
 )
 if (-not [string]::IsNullOrWhiteSpace($CloudflareAccountId)) {
     $argsList += @("--cloudflare-account-id", $CloudflareAccountId)
+} else {
+    # Explicitly remove an old Cloudflare route if the user chose to skip it.
+    $argsList += "--no-cloudflare"
 }
 
 Write-Host ""
