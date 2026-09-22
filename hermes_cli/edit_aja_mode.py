@@ -102,6 +102,7 @@ def build_edit_aja_free_cloud_config(
     cloudflare_account_id: str | None = None,
     cloudflare_model: str = DEFAULT_CLOUDFLARE_MODEL,
     groq_model: str = DEFAULT_GROQ_MODEL,
+    disable_cloudflare: bool = False,
 ) -> dict[str, Any]:
     """Return Edit Aja's recurring-free, non-Gemini configuration.
 
@@ -120,8 +121,8 @@ def build_edit_aja_free_cloud_config(
     )
     groq_model = str(groq_model or DEFAULT_GROQ_MODEL).strip() or DEFAULT_GROQ_MODEL
 
-    cf_account = _clean_account_id(cloudflare_account_id)
-    if not cf_account:
+    cf_account = "" if disable_cloudflare else _clean_account_id(cloudflare_account_id)
+    if not disable_cloudflare and not cf_account:
         cf_account = _existing_cloudflare_account_id(cfg)
 
     providers = _dict_section(cfg, "providers")
@@ -225,6 +226,7 @@ def apply_edit_aja_free_cloud_defaults(
     cloudflare_account_id: str | None = None,
     cloudflare_model: str = DEFAULT_CLOUDFLARE_MODEL,
     groq_model: str = DEFAULT_GROQ_MODEL,
+    disable_cloudflare: bool = False,
 ) -> dict[str, Any]:
     cfg = build_edit_aja_free_cloud_config(
         load_config(),
@@ -232,6 +234,7 @@ def apply_edit_aja_free_cloud_defaults(
         cloudflare_account_id=cloudflare_account_id,
         cloudflare_model=cloudflare_model,
         groq_model=groq_model,
+        disable_cloudflare=disable_cloudflare,
     )
     save_config(cfg)
     return cfg
@@ -246,6 +249,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--main-model", default=DEFAULT_MAIN_MODEL)
     parser.add_argument("--cloudflare-account-id", default="")
+    parser.add_argument(
+        "--no-cloudflare",
+        action="store_true",
+        help="Explicitly remove/skip the Cloudflare route even if an old account id exists in config.",
+    )
     parser.add_argument("--cloudflare-model", default=DEFAULT_CLOUDFLARE_MODEL)
     parser.add_argument("--groq-model", default=DEFAULT_GROQ_MODEL)
     args = parser.parse_args(argv)
@@ -255,8 +263,8 @@ def main(argv: list[str] | None = None) -> int:
         cloudflare_account_id=args.cloudflare_account_id,
         cloudflare_model=args.cloudflare_model,
         groq_model=args.groq_model,
+        disable_cloudflare=args.no_cloudflare,
     )
-    fallbacks = cfg.get("fallback_providers") or []
 
     print("Edit Aja recurring-free mode configured.")
     print(f"  Primary:     {cfg['model']['provider']} / {cfg['model']['default']}")
