@@ -5,7 +5,7 @@
 
 param(
     [string]$CloudflareAccountId = "",
-    [string]$MainModel = "gpt-oss-120b",
+    [string]$MainModel = "openai/gpt-oss-120b",
     [string]$CloudflareModel = "@cf/zai-org/glm-4.7-flash",
     [string]$GroqModel = "openai/gpt-oss-120b"
 )
