@@ -15,11 +15,11 @@ $replacement = Join-Path $hermesHome "hermes-agent\scripts\configure-edit-aja-fr
 
 Write-Host ""
 Write-Host "Gemini setup has been retired from Edit Aja."
-Write-Host "Switching to Cerebras-first free-cloud setup instead."
+Write-Host "Switching to Cloudflare-first recurring-free setup instead."
 Write-Host ""
 
 if (-not (Test-Path -LiteralPath $replacement)) {
-    throw "Free-cloud setup helper was not found at $replacement."
+    throw "Recurring-free setup helper was not found at $replacement."
 }
 
 $replacementText = Get-Content -LiteralPath $replacement -Raw
