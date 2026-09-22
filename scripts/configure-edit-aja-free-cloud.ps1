@@ -66,13 +66,14 @@ if ($LASTEXITCODE -ne 0) {
     throw "Could not apply Edit Aja free-cloud configuration."
 }
 
-$providersToList = @("cerebras")
+$providersToList = @()
 
 Write-Host ""
 if (Ask-YesNo "Add a Cerebras API key now?" $true) {
     & $hermes auth add cerebras --type api-key --label "Cerebras 01"
     if ($LASTEXITCODE -ne 0) { throw "Could not add the Cerebras API key." }
 }
+$providersToList += "cerebras"
 
 if (-not [string]::IsNullOrWhiteSpace($CloudflareAccountId)) {
     Write-Host ""
